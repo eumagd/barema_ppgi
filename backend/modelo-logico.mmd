@@ -1,0 +1,104 @@
+erDiagram
+    DOCENTE ||--o{ DISCENTE : "orienta (máx. 8)"
+    DOCENTE ||--o{ COORIENTACAO : coorienta
+    EXTERNO ||--o{ COORIENTACAO : coorienta
+    DISCENTE ||--o{ COORIENTACAO : "é coorientado"
+    DOCENTE |o--o| AUTOR : "é um"
+    DISCENTE |o--o| AUTOR : "é um"
+    EXTERNO |o--o| AUTOR : "é um"
+    AUTOR ||--o{ AUTORIA : escreve
+    PUBLICACAO ||--|{ AUTORIA : "tem autores"
+    VEICULO ||--o{ PUBLICACAO : "publicada em"
+    VEICULO ||--o{ ESTRATO_QUALIS : pertence
+    DOCENTE ||--o{ AVALIACAO : submete
+    RESOLUCAO ||--o{ AVALIACAO : "rege"
+    AVALIACAO ||--o{ AVALIACAO_PUBLICACAO : considera
+    PUBLICACAO ||--o{ AVALIACAO_PUBLICACAO : "entra em"
+
+    DOCENTE {
+        int id_docente PK
+        varchar matricula UK
+        varchar nome
+        varchar email UK
+        varchar url_lattes
+        date data_ultima_atualizacao
+        enum vinculo "PERMANENTE | COLABORADOR | nulo"
+        date data_recusa_participacao
+    }
+    DISCENTE {
+        int id_discente PK
+        varchar matricula UK
+        varchar nome
+        int ano_ingresso
+        int id_orientador FK
+    }
+    EXTERNO {
+        int id_externo PK
+        varchar nome
+        varchar inst_origem
+    }
+    COORIENTACAO {
+        int id_coorientacao PK
+        int id_discente FK
+        int id_docente FK "ou"
+        int id_externo FK "ou"
+    }
+    AUTOR {
+        int id_autor PK
+        enum tipo
+        varchar nome_citacao
+        int id_docente FK
+        int id_discente FK
+        int id_externo FK
+    }
+    AUTORIA {
+        int id_publicacao PK,FK
+        int id_autor PK,FK
+        int ordem_autoria
+    }
+    PUBLICACAO {
+        int id_publicacao PK
+        varchar titulo
+        int ano_publicacao
+        decimal correspondencia
+        int id_veiculo FK
+    }
+    VEICULO {
+        int id_veiculo PK
+        varchar nome
+        varchar issn_sigla
+        enum tipo "PERIODICO | CONFERENCIA"
+    }
+    ESTRATO_QUALIS {
+        int id_veiculo PK,FK
+        int ano_base PK
+        varchar area_de_atuacao PK
+        enum estrato
+        decimal pontuacao
+    }
+    RESOLUCAO {
+        int id_resolucao PK
+        varchar numero_ano UK
+        date data_vigencia
+        varchar link_documento
+    }
+    AVALIACAO {
+        int id_processo PK
+        enum tipo "CREDENCIAMENTO | RECREDENCIAMENTO"
+        date data_solicitacao
+        enum status
+        decimal pontuacao_pesquisa
+        bool cumpriu_docencia
+        bool cumpriu_orientacao
+        bool possui_coautoria_discente
+        date valido_ate
+        enum status_relatorio
+        int id_docente FK
+        int id_resolucao FK
+    }
+    AVALIACAO_PUBLICACAO {
+        int id_processo PK,FK
+        int id_publicacao PK,FK
+        bool considerada
+        decimal pontos_atribuidos
+    }

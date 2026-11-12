@@ -1,0 +1,317 @@
+// =====================================================================
+// Banco de dados — Plataforma de Gerenciamento de Baremas (PPGI/UFAL)
+//
+// Esquema escrito no Prisma ORM a partir do Modelo ER (Sprint 7).
+// O Prisma gera a migração inicial (prisma/migrations/*_init).
+// O que o Prisma não consegue expressar (CHECKs, gatilhos, índices
+// parciais e a view de resumo) está na migração *_ajustes_manuais.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// Enumerações
+// ---------------------------------------------------------------------
+
+/// Especialização parcial e disjunta de DOCENTE (PERMANENTE | COLABORADOR).
+/// Nulo = docente do IC sem vínculo com o PPGI.
+enum VinculoPpgi {
+  PERMANENTE
+  COLABORADOR
+
+  @@map("vinculo_ppgi")
+}
+
+/// Categoria (união) AUTOR = DOCENTE ∪ DISCENTE ∪ EXTERNO.
+enum TipoAutor {
+  DOCENTE
+  DISCENTE
+  EXTERNO
+
+  @@map("tipo_autor")
+}
+
+/// Especialização disjunta de VEICULO.
+enum TipoVeiculo {
+  PERIODICO
+  CONFERENCIA
+
+  @@map("tipo_veiculo")
+}
+
+enum Estrato {
+  A1
+  A2
+  A3
+  A4
+  B1
+  B2
+  B3
+  B4
+  C
+
+  @@map("estrato")
+}
+
+/// Especialização disjunta de AVALIACAO.
+enum TipoAvaliacao {
+  CREDENCIAMENTO
+  RECREDENCIAMENTO
+
+  @@map("tipo_avaliacao")
+}
+
+enum StatusAvaliacao {
+  EM_ANDAMENTO
+  DEFERIDO
+  INDEFERIDO
+  CANCELADO
+
+  @@map("status_avaliacao")
+}
+
+enum StatusRelatorio {
+  RASCUNHO
+  GERADO
+  ENVIADO
+
+  @@map("status_relatorio")
+}
+
+enum PerfilUsuario {
+  SECRETARIA
+  COORDENACAO
+
+  @@map("perfil_usuario")
+}
+
+// ---------------------------------------------------------------------
+// Pessoas
+// ---------------------------------------------------------------------
+
+model Docente {
+  id_docente               Int          @id @default(autoincrement())
+  matricula                String       @unique @db.VarChar(20)
+  nome                     String       @db.VarChar(150)
+  email                    String       @unique @db.VarChar(150)
+  url_lattes               String?      @db.VarChar(255)
+  data_ultima_atualizacao  DateTime?    @db.Date
+  /// Mapeamento da especialização PERMANENTE/COLABORADOR em tabela única.
+  vinculo                  VinculoPpgi?
+  /// RF16: data em que o docente declarou que não participará do ciclo.
+  data_recusa_participacao DateTime?    @db.Date
+
+  orientandos   Discente[]     @relation("Orienta")
+  coorientacoes Coorientacao[]
+  autor         Autor?
+  avaliacoes    Avaliacao[]
+
+  @@map("docente")
+}
+
+model Discente {
+  id_discente   Int    @id @default(autoincrement())
+  matricula     String @unique @db.VarChar(20)
+  nome          String @db.VarChar(150)
+  ano_ingresso  Int
+  /// Relacionamento Orienta (PERMANENTE 1 : N DISCENTE, máx. 8) — validado por gatilho.
+  id_orientador Int?
+
+  orientador    Docente?       @relation("Orienta", fields: [id_orientador], references: [id_docente], onDelete: SetNull)
+  coorientacoes Coorientacao[]
+  autor         Autor?
+
+  @@index([id_orientador])
+  @@map("discente")
+}
+
+model Externo {
+  id_externo  Int     @id @default(autoincrement())
+  nome        String  @db.VarChar(150)
+  inst_origem String? @db.VarChar(150)
+
+  coorientacoes Coorientacao[]
+  autor         Autor?
+
+  @@map("externo")
+}
+
+/// Relacionamento Coorienta (M:N): um docente OU um externo coorienta um discente.
+model Coorientacao {
+  id_coorientacao Int  @id @default(autoincrement())
+  id_discente     Int
+  id_docente      Int?
+  id_externo      Int?
+
+  discente Discente @relation(fields: [id_discente], references: [id_discente], onDelete: Cascade)
+  docente  Docente? @relation(fields: [id_docente], references: [id_docente], onDelete: Cascade)
+  externo  Externo? @relation(fields: [id_externo], references: [id_externo], onDelete: Cascade)
+
+  @@index([id_discente])
+  @@map("coorientacao")
+}
+
+/// Categoria AUTOR: chave substituta + referência para exatamente uma superclasse.
+model Autor {
+  id_autor     Int       @id @default(autoincrement())
+  tipo         TipoAutor
+  /// Nome como aparece nas publicações (usado no Fuzzy Match).
+  nome_citacao String    @db.VarChar(255)
+  id_docente   Int?      @unique
+  id_discente  Int?      @unique
+  id_externo   Int?      @unique
+
+  docente  Docente?  @relation(fields: [id_docente], references: [id_docente], onDelete: Cascade)
+  discente Discente? @relation(fields: [id_discente], references: [id_discente], onDelete: Cascade)
+  externo  Externo?  @relation(fields: [id_externo], references: [id_externo], onDelete: Cascade)
+  autorias Autoria[]
+
+  @@map("autor")
+}
+
+// ---------------------------------------------------------------------
+// Produção científica
+// ---------------------------------------------------------------------
+
+model Veiculo {
+  id_veiculo Int         @id @default(autoincrement())
+  nome       String      @db.VarChar(255)
+  /// ISSN (periódico) ou sigla (conferência).
+  issn_sigla String      @db.VarChar(30)
+  tipo       TipoVeiculo
+
+  estratos    EstratoQualis[]
+  publicacoes Publicacao[]
+
+  @@unique([tipo, issn_sigla])
+  @@map("veiculo")
+}
+
+/// Entidade fraca de VEICULO (relacionamento identificador Pertence).
+model EstratoQualis {
+  id_veiculo      Int
+  ano_base        Int
+  area_de_atuacao String  @db.VarChar(100)
+  estrato         Estrato
+  pontuacao       Decimal @db.Decimal(6, 2)
+
+  veiculo Veiculo @relation(fields: [id_veiculo], references: [id_veiculo], onDelete: Cascade)
+
+  @@id([id_veiculo, ano_base, area_de_atuacao])
+  @@map("estrato_qualis")
+}
+
+model Publicacao {
+  id_publicacao   Int      @id @default(autoincrement())
+  titulo          String   @db.VarChar(500)
+  ano_publicacao  Int
+  /// Grau de correspondência (0–100) devolvido pelo Fuzzy Match.
+  correspondencia Decimal? @db.Decimal(5, 2)
+  /// Relacionamento Publicada Em (N:1).
+  id_veiculo      Int?
+
+  veiculo    Veiculo?              @relation(fields: [id_veiculo], references: [id_veiculo], onDelete: SetNull)
+  autorias   Autoria[]
+  avaliacoes AvaliacaoPublicacao[]
+
+  @@index([id_veiculo])
+  @@index([ano_publicacao])
+  @@map("publicacao")
+}
+
+/// Relacionamento Escreve (AUTOR M:N PUBLICACAO) com o atributo ordem_autoria.
+model Autoria {
+  id_publicacao Int
+  id_autor      Int
+  ordem_autoria Int
+
+  publicacao Publicacao @relation(fields: [id_publicacao], references: [id_publicacao], onDelete: Cascade)
+  autor      Autor      @relation(fields: [id_autor], references: [id_autor], onDelete: Cascade)
+
+  @@id([id_publicacao, id_autor])
+  @@unique([id_publicacao, ordem_autoria])
+  @@index([id_autor])
+  @@map("autoria")
+}
+
+// ---------------------------------------------------------------------
+// Processo avaliativo
+// ---------------------------------------------------------------------
+
+model Resolucao {
+  id_resolucao   Int      @id @default(autoincrement())
+  /// Ex.: "1/2025".
+  numero_ano     String   @unique @db.VarChar(20)
+  data_vigencia  DateTime @db.Date
+  link_documento String?  @db.VarChar(500)
+
+  avaliacoes Avaliacao[]
+
+  @@map("resolucao")
+}
+
+/// AVALIACAO e suas subclasses CREDENCIAMENTO/RECREDENCIAMENTO em tabela única.
+model Avaliacao {
+  id_processo               Int             @id @default(autoincrement())
+  tipo                      TipoAvaliacao
+  data_solicitacao          DateTime        @default(now()) @db.Date
+  status                    StatusAvaliacao @default(EM_ANDAMENTO)
+  pontuacao_pesquisa        Decimal?        @db.Decimal(8, 2)
+  cumpriu_docencia          Boolean?
+  cumpriu_orientacao        Boolean?
+  possui_coautoria_discente Boolean?
+  valido_ate                DateTime?       @db.Date
+  status_relatorio          StatusRelatorio @default(RASCUNHO)
+  data_envio_relatorio      DateTime?
+  /// Relacionamento Submete (DOCENTE 1:N AVALIACAO).
+  id_docente                Int
+  /// Relacionamento Regida Por (AVALIACAO N:1 RESOLUCAO).
+  id_resolucao              Int
+
+  docente     Docente               @relation(fields: [id_docente], references: [id_docente], onDelete: Restrict)
+  resolucao   Resolucao             @relation(fields: [id_resolucao], references: [id_resolucao], onDelete: Restrict)
+  publicacoes AvaliacaoPublicacao[]
+
+  @@index([id_docente])
+  @@index([id_resolucao])
+  @@map("avaliacao")
+}
+
+/// Publicações consideradas em cada avaliação (RF06 e RF13).
+model AvaliacaoPublicacao {
+  id_processo       Int
+  id_publicacao     Int
+  /// false = coautoria desmarcada na revisão manual.
+  considerada       Boolean  @default(true)
+  /// Pontos atribuídos ao docente após a divisão entre coautores.
+  pontos_atribuidos Decimal? @db.Decimal(8, 2)
+
+  avaliacao  Avaliacao  @relation(fields: [id_processo], references: [id_processo], onDelete: Cascade)
+  publicacao Publicacao @relation(fields: [id_publicacao], references: [id_publicacao], onDelete: Cascade)
+
+  @@id([id_processo, id_publicacao])
+  @@index([id_publicacao])
+  @@map("avaliacao_publicacao")
+}
+
+// ---------------------------------------------------------------------
+// Acesso à plataforma
+// ---------------------------------------------------------------------
+
+model Usuario {
+  id_usuario Int           @id @default(autoincrement())
+  nome       String        @db.VarChar(150)
+  email      String        @unique @db.VarChar(150)
+  senha_hash String        @db.VarChar(255)
+  perfil     PerfilUsuario
+  criado_em  DateTime      @default(now())
+
+  @@map("usuario")
+}

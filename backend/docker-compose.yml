@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: barema_ppgi_db
+    environment:
+      POSTGRES_USER: ppgi
+      POSTGRES_PASSWORD: ppgi
+      POSTGRES_DB: barema_ppgi
+    ports:
+      - "5432:5432"
+    volumes:
+      - barema_ppgi_data:/var/lib/postgresql/data
+
+volumes:
+  barema_ppgi_data:
