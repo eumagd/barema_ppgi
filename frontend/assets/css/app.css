@@ -1,0 +1,172 @@
+/*
+ * Estilos complementares ao Tailwind — Plataforma de Gerenciamento de Baremas PPGI/UFAL
+ *
+ * Cores em formato "R G B" para o Tailwind aplicar opacidade (ex.: bg-ppgi/10).
+ * Tema claro em :root; tema escuro em html.dark (alternado por core/theme.js).
+ */
+
+:root {
+  --c-surface: 255 255 255;
+  --c-page: 246 248 252;
+  --c-ink: 0 0 0;
+  --c-muted: 74 90 117;
+  --c-ppgi: 4 70 159;
+  --c-ppgi-strong: 3 54 124;
+  --c-soft: 191 207 230;
+  --c-tint: 238 242 250;
+  --c-yellow: 255 222 89;
+  --c-danger: 179 38 30;
+  color-scheme: light;
+}
+
+html.dark {
+  --c-surface: 18 27 46;
+  --c-page: 11 18 32;
+  --c-ink: 232 238 248;
+  --c-muted: 159 176 200;
+  --c-ppgi: 138 180 248;
+  --c-ppgi-strong: 176 204 250;
+  --c-soft: 46 62 92;
+  --c-tint: 26 38 62;
+  --c-yellow: 255 222 89;
+  --c-danger: 255 138 128;
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: rgb(var(--c-page));
+  color: rgb(var(--c-ink));
+  font-family: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s;
+}
+
+#app:empty {
+  min-height: 100vh;
+}
+
+/* Foco sempre visível (acessibilidade) */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--c-ppgi));
+  outline-offset: 2px;
+}
+
+/* Campos de formulário com a aparência do design system */
+.field-input {
+  width: 100%;
+  border: 1px solid rgb(var(--c-soft));
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-ink));
+  padding: 0.55rem 0.75rem;
+  font-size: 15px;
+  border-radius: 0;
+  transition: border-color 0.15s;
+}
+.field-input::placeholder {
+  color: rgb(var(--c-muted));
+}
+.field-input:hover,
+.field-input:focus {
+  border-color: rgb(var(--c-ppgi));
+}
+.field-input[aria-invalid="true"] {
+  border-color: rgb(var(--c-danger));
+}
+select.field-input {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: linear-gradient(45deg, transparent 50%, rgb(var(--c-ppgi)) 50%),
+    linear-gradient(135deg, rgb(var(--c-ppgi)) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* Logo: versão escura só no modo escuro */
+.logo-dark {
+  display: none;
+}
+html.dark .logo-light {
+  display: none;
+}
+html.dark .logo-dark {
+  display: inline-block;
+}
+
+.progress-fill {
+  transition: width 0.25s linear;
+}
+
+.toast-enter {
+  animation: toast-in 0.2s ease-out;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-enter {
+  animation: modal-in 0.15s ease-out;
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.drawer {
+  transition: transform 0.2s ease-out;
+}
+
+/* Painel da marca no login: azul institucional e texto branco em qualquer tema */
+.brand-panel {
+  background-color: #04469f;
+  color: #ffffff;
+}
+.brand-ring {
+  border: 40px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Fundo decorativo discreto da página inicial (pontos, não quadriculado) */
+.hero-dots {
+  background-image: radial-gradient(rgb(var(--c-soft) / 0.7) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Impressão: só a prévia do relatório, sempre em tema claro */
+@media print {
+  html.dark {
+    --c-surface: 255 255 255;
+    --c-page: 255 255 255;
+    --c-ink: 0 0 0;
+    --c-muted: 74 90 117;
+    --c-ppgi: 4 70 159;
+    --c-soft: 191 207 230;
+    --c-tint: 238 242 250;
+    --c-danger: 179 38 30;
+  }
+  html.dark .logo-light { display: inline-block; }
+  html.dark .logo-dark { display: none; }
+  body.printing-report * { visibility: hidden; }
+  body.printing-report #print-area,
+  body.printing-report #print-area * { visibility: visible; }
+  body.printing-report #print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-width: none;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
