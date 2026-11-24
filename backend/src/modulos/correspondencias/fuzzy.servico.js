@@ -216,7 +216,28 @@ function criarServicoFuzzy({ prisma }) {
     });
   }
 
-  return { processar, decidir };
+  /**
+   * DOI já cadastrado em outra publicação: a nova (gravada sem DOI, por causa do índice
+   * único) é mesclada na existente, com a correspondência registrada (nota 100, motivo DOI).
+   */
+  async function mesclarPorDoi(idNova, idExistente) {
+    return prisma.$transaction(async (tx) => {
+      const movidos = await mesclar(tx, idNova, idExistente);
+      return tx.correspondencia.create({
+        data: {
+          tipo: "PUBLICACAO",
+          id_publicacao: Math.max(idNova, idExistente),
+          id_publicacao_candidata: Math.min(idNova, idExistente),
+          nota: 100,
+          motivo: "DOI",
+          decisao: "AUTOMATICA",
+          autores_movidos: movidos,
+        },
+      });
+    });
+  }
+
+  return { processar, decidir, mesclarPorDoi };
 }
 
 module.exports = { criarServicoFuzzy, publicacaoVigente, obterCortes, buscarCandidatas };

@@ -66,6 +66,10 @@ Rotas autenticadas exigem o cabeçalho `Authorization: Bearer <token>` devolvido
 | `GET /api/correspondencias` | autenticado | `?faixa=revisao\|automatica\|decididas\|todas&id_docente=`: pares do Fuzzy Match |
 | `PATCH /api/correspondencias/:id` | autenticado | `{ decisao: CONFIRMADA\|REJEITADA, justificativa? }`: confirmar mescla; rejeitar desfaz |
 | `POST /api/correspondencias/processar` | autenticado | Roda o Fuzzy Match na base toda (ex.: depois de mudar os cortes) |
+| `GET /api/autores` | autenticado | `?busca=&tipo=DOCENTE\|DISCENTE\|EXTERNO`: para escolher coautores |
+| `POST /api/publicacoes` | autenticado | Cadastro manual (eventos, coautores): `{ titulo, ano, doi?, veiculo, autores: [id_autor] }` |
+| `GET/PATCH/DELETE /api/publicacoes/:id` | autenticado | Detalhe, edição e exclusão (recusada se já entrou numa avaliação) |
+| `POST/DELETE /api/publicacoes/:id/autores` | autenticado | Acrescenta ou retira coautores (ex.: o discente do recredenciamento) |
 
 Perfis (RNF-BE07): **SECRETARIA** conduz o processo (importações, cadastros, revisão); **COORDENACAO**
 pode tudo isso e também altera os parâmetros da resolução.
@@ -94,9 +98,14 @@ nome,lattes_url,ano_publicacao,titulo_publicacao,periodico,issn,qualis,pontos,ar
   publicação com as duas autorias: é assim que a coautoria entre docentes aparece.
 
 **Limites do CSV do QLattes** (conferidos no código da versão 0.2.2): ele **não exporta eventos,
-lista de coautores nem DOI**. Por isso (a) a produção em eventos (58% do PPGI) precisa de outra
-entrada, a planilha de transição ou um cadastro de anais; e (b) a coautoria com **discentes**,
-exigida no recredenciamento, não vem do arquivo e terá de ser marcada na revisão ou vir de outra fonte.
+lista de coautores nem DOI**. Para isso existe o **cadastro manual** (`/api/publicacoes`):
+
+- **Artigo em evento:** `veiculo: { "tipo": "CONFERENCIA", "sigla": "SBBD", "nome": "..." }`. O estrato
+  vem da tabela Qualis Eventos pela sigla.
+- **Coautor discente ou externo:** `POST /api/publicacoes/:id/autores { id_autor }`, com o autor
+  achado em `GET /api/autores?busca=`.
+- Cadastros manuais também passam pelo Fuzzy Match; um DOI já existente é tratado como a mesma
+  publicação (mescla com nota 100).
 
 ### Fuzzy Match
 
@@ -191,7 +200,7 @@ backend/
 │   ├── dominio/                              regras da Resolução nº 1/2025 (parâmetros iniciais)
 │   ├── lib/                                  erros, hash de senha, e-mail
 │   ├── middlewares/                          autenticação/RBAC, validação (Zod), erros, limite de tentativas
-│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias
+│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias, publicacoes
 ├── test/                                     unidade (Prisma em memória) e integracao/ (PostgreSQL)
 ├── scripts/testar-integracao.js              migra o banco de teste e roda test/integracao
 ├── prisma/
@@ -211,5 +220,5 @@ backend/
 ## Próximos passos
 
 - Calibrar os cortes do Fuzzy Match com a planilha histórica.
-- Entrada da produção em eventos e da coautoria com discentes (o CSV do QLattes não traz).
+- Importação da planilha de transição (`Credenciamento2026.xlsx`), quando o layout estiver disponível.
 - Motor de cálculo da Resolução nº 1/2025 e troca do `localStorage` do front end pela API.
