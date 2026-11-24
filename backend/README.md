@@ -10,7 +10,7 @@ numa migração manual.
 
 ## Como executar
 
-Pré-requisitos: Node.js 18+ e PostgreSQL 14+ (ou Docker).
+Pré-requisitos: Node.js 20+ e PostgreSQL 14+ (ou Docker). O banco precisa das extensões `pg_trgm`, `unaccent` e `fuzzystrmatch` (já vêm na imagem `postgres:16`).
 
 ```bash
 cd backend
@@ -20,7 +20,32 @@ npm run db:up                 # sobe o PostgreSQL pelo Docker (opcional)
 npx prisma migrate dev        # aplica as migrações (init + ajustes manuais)
 npx prisma db seed            # dados de demonstração (mesmos do front end)
 npx prisma studio             # abre o navegador de dados
+npm run dev                   # sobe a API em http://localhost:3000
+npm test                      # testes da API (não precisam de banco)
 ```
+
+Usuários do seed: `secretaria@ic.ufal.br` e `coordenacao@ic.ufal.br`, senha `ppgi2026`.
+
+## API
+
+Respostas de erro seguem sempre o formato `{ "erro": { "codigo", "mensagem", "detalhes?" } }`.
+Rotas autenticadas exigem o cabeçalho `Authorization: Bearer <token>` devolvido no login.
+
+| Rota | Acesso | O que faz |
+| --- | --- | --- |
+| `GET /api/saude` | público | Verifica a API e a conexão com o banco |
+| `POST /api/auth/login` | público | `{ email, senha }` → `{ token, usuario }` |
+| `GET /api/auth/eu` | autenticado | Usuário da sessão |
+| `POST /api/auth/recuperar-senha` | público | Envia link de redefinição (responde 202 com ou sem cadastro) |
+| `POST /api/auth/redefinir-senha` | público | `{ token, senha }`; o link vale 60 min e uma única vez |
+| `GET /api/resolucoes` | autenticado | Resoluções cadastradas |
+| `GET /api/resolucoes/:id/parametros` | autenticado | Pesos por estrato, mínimos e cortes do Fuzzy Match |
+| `PUT /api/resolucoes/:id/parametros/:chave` | coordenação | `{ valor }`, validado por chave |
+
+Perfis (RNF-BE07): **SECRETARIA** conduz o processo (importações, cadastros, revisão); **COORDENACAO**
+pode tudo isso e também altera os parâmetros da resolução.
+
+Sem `SMTP_HOST` no `.env`, os e-mails (ex.: link de redefinição) aparecem só no console da API.
 
 ## Do Modelo ER para o banco
 
@@ -72,12 +97,22 @@ chaves estrangeiras com as ações `ON DELETE`, índices e restrições de unici
 
 ```
 backend/
+├── src/
+│   ├── app.js / server.js                    montagem do Express e ponto de entrada
+│   ├── config.js / db.js                     variáveis de ambiente e Prisma Client
+│   ├── dominio/                              regras da Resolução nº 1/2025 (parâmetros iniciais)
+│   ├── lib/                                  erros, hash de senha, e-mail
+│   ├── middlewares/                          autenticação/RBAC, validação (Zod), erros, limite de tentativas
+│   └── modulos/                              auth, parametros
+├── test/                                     testes (node:test + supertest, com Prisma em memória)
 ├── prisma/
 │   ├── schema.prisma                         esquema (modelo do Prisma)
 │   ├── seed.js                               dados de demonstração
 │   └── migrations/
 │       ├── 20261111120000_init/              gerada pelo Prisma
-│       └── 20261111120500_ajustes_manuais/   CHECKs, gatilhos, índices parciais e view
+│       ├── 20261111120500_ajustes_manuais/   CHECKs, gatilhos, índices parciais e view
+│       ├── 20261124120000_integracao_qlattes/       gerada pelo Prisma (+ extensões)
+│       └── 20261124120500_integracao_ajustes_manuais/  normalização de texto, CHECKs, dados
 ├── modelo-logico.mmd / modelo-logico.png     diagrama do modelo lógico
 ├── docker-compose.yml                        PostgreSQL 16 para desenvolvimento
 ├── .env.example
@@ -86,6 +121,6 @@ backend/
 
 ## Próximos passos
 
-- Cadastro de disciplinas e turmas (critério de docência, RF09 do levantamento) — ainda não está no ER.
-- Importação do CSV do QLattes para `publicacao`, `autor` e `autoria`.
-- API do back end consumindo este banco e substituindo o `localStorage` do front end.
+- Carga das bases Qualis (CAPES, PUC-RS, Scopus, Eventos) e CRUDs de docentes, discentes, orientações e disciplinas.
+- Importação do CSV do QLattes para `publicacao`, `autor` e `autoria`, com Fuzzy Match no PostgreSQL.
+- Motor de cálculo da Resolução nº 1/2025 e troca do `localStorage` do front end pela API.
