@@ -155,6 +155,16 @@ enum DecisaoCorrespondencia {
   @@map("decisao_correspondencia")
 }
 
+/// Situação do docente na UFAL (exibida em professores.html e perfil.html).
+enum SituacaoFuncional {
+  EFETIVO
+  SUBSTITUTO
+  VISITANTE
+  APOSENTADO
+
+  @@map("situacao_funcional")
+}
+
 enum NivelDisciplina {
   GRADUACAO
   POS_GRADUACAO
@@ -167,20 +177,22 @@ enum NivelDisciplina {
 // ---------------------------------------------------------------------
 
 model Docente {
-  id_docente               Int          @id @default(autoincrement())
-  matricula                String       @unique @db.VarChar(20)
-  nome                     String       @db.VarChar(150)
-  email                    String       @unique @db.VarChar(150)
-  url_lattes               String?      @db.VarChar(255)
+  id_docente               Int               @id @default(autoincrement())
+  matricula                String            @unique @db.VarChar(20)
+  nome                     String            @db.VarChar(150)
+  email                    String            @unique @db.VarChar(150)
+  departamento             String?           @db.VarChar(150)
+  situacao_funcional       SituacaoFuncional @default(EFETIVO)
+  url_lattes               String?           @db.VarChar(255)
   /// ID do Lattes (16 dígitos): sustenta a validação de vínculo da importação (RF-BE03).
-  id_lattes                String?      @unique @db.Char(16)
-  data_ultima_atualizacao  DateTime?    @db.Date
+  id_lattes                String?           @unique @db.Char(16)
+  data_ultima_atualizacao  DateTime?         @db.Date
   /// Mapeamento da especialização PERMANENTE/COLABORADOR em tabela única.
   vinculo                  VinculoPpgi?
   /// Início do vínculo atual com o PPGI: recém-credenciados (< 24 meses) e progressão Colaborador → Permanente.
-  data_vinculo             DateTime?    @db.Date
+  data_vinculo             DateTime?         @db.Date
   /// RF16: data em que o docente declarou que não participará do ciclo.
-  data_recusa_participacao DateTime?    @db.Date
+  data_recusa_participacao DateTime?         @db.Date
 
   orientandos   Discente[]     @relation("Orienta")
   coorientacoes Coorientacao[]

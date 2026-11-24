@@ -8,6 +8,10 @@ const config = require("./config");
 const { criarRotasAuth } = require("./modulos/auth/auth.rotas");
 const { criarRotasParametros } = require("./modulos/parametros/parametros.rotas");
 const { criarRotasQualis } = require("./modulos/qualis/qualis.rotas");
+const { criarRotasDocentes } = require("./modulos/cadastros/docentes.rotas");
+const { criarRotasDiscentes, criarRotasExternos } = require("./modulos/cadastros/discentes.rotas");
+const { criarRotasDisciplinas, criarRotasTurmas } = require("./modulos/cadastros/disciplinas.rotas");
+const { autenticar } = require("./middlewares/autenticacao");
 const { rotaNaoEncontrada, tratarErros } = require("./middlewares/erros");
 
 function criarApp({ prisma, email }) {
@@ -31,6 +35,11 @@ function criarApp({ prisma, email }) {
   app.use("/api/auth", criarRotasAuth({ prisma, email }));
   app.use("/api/resolucoes", criarRotasParametros({ prisma }));
   app.use("/api/qualis", criarRotasQualis({ prisma }));
+  app.use("/api/docentes", autenticar, criarRotasDocentes({ prisma }));
+  app.use("/api/discentes", autenticar, criarRotasDiscentes({ prisma }));
+  app.use("/api/externos", autenticar, criarRotasExternos({ prisma }));
+  app.use("/api/disciplinas", autenticar, criarRotasDisciplinas({ prisma }));
+  app.use("/api/turmas", autenticar, criarRotasTurmas({ prisma }));
 
   app.use(rotaNaoEncontrada);
   app.use(tratarErros);
