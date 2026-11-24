@@ -11,6 +11,7 @@ const { criarRotasQualis } = require("./modulos/qualis/qualis.rotas");
 const { criarRotasDocentes } = require("./modulos/cadastros/docentes.rotas");
 const { criarRotasDiscentes, criarRotasExternos } = require("./modulos/cadastros/discentes.rotas");
 const { criarRotasDisciplinas, criarRotasTurmas } = require("./modulos/cadastros/disciplinas.rotas");
+const { criarRotasImportacoes } = require("./modulos/importacoes/importacoes.rotas");
 const { autenticar } = require("./middlewares/autenticacao");
 const { rotaNaoEncontrada, tratarErros } = require("./middlewares/erros");
 
@@ -40,6 +41,7 @@ function criarApp({ prisma, email }) {
   app.use("/api/externos", autenticar, criarRotasExternos({ prisma }));
   app.use("/api/disciplinas", autenticar, criarRotasDisciplinas({ prisma }));
   app.use("/api/turmas", autenticar, criarRotasTurmas({ prisma }));
+  app.use("/api/importacoes", criarRotasImportacoes({ prisma }));
 
   app.use(rotaNaoEncontrada);
   app.use(tratarErros);

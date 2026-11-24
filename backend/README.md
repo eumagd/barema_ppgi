@@ -58,11 +58,42 @@ Rotas autenticadas exigem o cabeçalho `Authorization: Bearer <token>` devolvido
 | `/api/discentes` (+ `/:id/coorientacoes`) | autenticado | CRUD, orientador, defesa e coorientações |
 | `/api/externos` | autenticado | Membros externos (coorientadores e coautores) |
 | `/api/disciplinas`, `/api/turmas` | autenticado | Critério de Docência; "Estudo Dirigido" é marcado sozinho |
+| `POST /api/importacoes` | autenticado | Multipart: `arquivo` (.csv do QLattes + `id_docente`, ou .zip com vários .csv), `confirmar_nome`? |
+| `GET /api/importacoes`, `GET /api/importacoes/:id` | autenticado | Histórico das importações de currículo, com contagens e erros por linha |
+| `GET /api/docentes/:id/publicacoes` | autenticado | `?inicio=&fim=` (anos): produção com estrato vigente, fonte e coautores |
+| `GET /api/qualis/pendentes` | autenticado | Fila manual: periódicos com publicações e sem estrato em nenhuma base |
+| `POST /api/qualis/classificacoes` | autenticado | `{ id_veiculo, estrato, justificativa }` → estrato com fonte `MANUAL` |
 
 Perfis (RNF-BE07): **SECRETARIA** conduz o processo (importações, cadastros, revisão); **COORDENACAO**
 pode tudo isso e também altera os parâmetros da resolução.
 
 Sem `SMTP_HOST` no `.env`, os e-mails (ex.: link de redefinição) aparecem só no console da API.
+
+### Importação do QLattes
+
+No currículo Lattes (depois de resolver o CAPTCHA), abra a visualização do QLattes, escolha o CV e
+clique em **Exportar dados**. O arquivo (`nome_do_docente.csv`) tem uma linha por **artigo em periódico**:
+
+```
+nome,lattes_url,ano_publicacao,titulo_publicacao,periodico,issn,qualis,pontos,area,ano_base
+```
+
+- **Individual:** envie o `.csv` com o `id_docente`. O ID Lattes da URL é conferido com o cadastro
+  (e gravado nele na primeira importação); se o docente ainda não tem ID e o nome não bate, a API pede
+  `confirmar_nome=true`.
+- **Lote:** um `.zip` com vários `.csv`; cada arquivo é casado pelo ID Lattes ou, na falta dele, pelo
+  nome. A resposta (207) diz o resultado de cada arquivo.
+- **Idempotente:** o mesmo arquivo não é reprocessado; um CSV atualizado só acrescenta publicações e
+  nunca apaga autorias.
+- O estrato que o QLattes já calculou é guardado com a fonte deduzida do `ano_base` ("quadriênio
+  2017-2020" → CAPES, "2021" → PUC-RS, "2020" → Scopus), mas as tabelas carregadas no servidor prevalecem.
+- Artigos iguais (título normalizado + ano + periódico) em CVs de docentes diferentes viram uma única
+  publicação com as duas autorias: é assim que a coautoria entre docentes aparece.
+
+**Limites do CSV do QLattes** (conferidos no código da versão 0.2.2): ele **não exporta eventos,
+lista de coautores nem DOI**. Por isso (a) a produção em eventos (58% do PPGI) precisa de outra
+entrada, a planilha de transição ou um cadastro de anais; e (b) a coautoria com **discentes**,
+exigida no recredenciamento, não vem do arquivo e terá de ser marcada na revisão ou vir de outra fonte.
 
 ### Bases Qualis
 
@@ -136,7 +167,7 @@ backend/
 │   ├── dominio/                              regras da Resolução nº 1/2025 (parâmetros iniciais)
 │   ├── lib/                                  erros, hash de senha, e-mail
 │   ├── middlewares/                          autenticação/RBAC, validação (Zod), erros, limite de tentativas
-│   └── modulos/                              auth, parametros, qualis, cadastros
+│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes
 ├── test/                                     unidade (Prisma em memória) e integracao/ (PostgreSQL)
 ├── scripts/testar-integracao.js              migra o banco de teste e roda test/integracao
 ├── prisma/
@@ -155,5 +186,6 @@ backend/
 
 ## Próximos passos
 
-- Importação do CSV do QLattes para `publicacao`, `autor` e `autoria`, com Fuzzy Match no PostgreSQL.
+- Fuzzy Match no PostgreSQL (DOI → ISSN+título → `pg_trgm` com ano ±1) e fila de revisão.
+- Entrada da produção em eventos e da coautoria com discentes (o CSV do QLattes não traz).
 - Motor de cálculo da Resolução nº 1/2025 e troca do `localStorage` do front end pela API.

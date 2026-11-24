@@ -10,6 +10,7 @@
  *   DELETE /api/docentes/:id/recusa      desfaz a sinalização
  *   POST   /api/docentes/:id/nomes-citacao       { nome }  nova variação (RF-BE09)
  *   DELETE /api/docentes/:id/nomes-citacao/:idNome
+ *   GET    /api/docentes/:id/publicacoes         ?inicio=AAAA&fim=AAAA  produção com estrato vigente, fonte e coautores
  */
 const { Router } = require("express");
 const { z } = require("zod");
@@ -18,6 +19,14 @@ const { exigirPerfil, PERFIS } = require("../../middlewares/autenticacao");
 const { Erros } = require("../../lib/erros");
 const { normalizarTexto } = require("../../lib/texto");
 const { id, paramsId, data, texto, textoOpcional, criarAutor, exigir } = require("./comum");
+const { estratoVigente, AREA_PADRAO } = require("../qualis/qualis.servico");
+
+/** Nome e tipo de cada coautor (docente do PPGI, docente sem vínculo, discente ou externo). */
+function descreverAutor(autor) {
+  if (autor.docente) return { id_autor: autor.id_autor, tipo: "DOCENTE", nome: autor.docente.nome, vinculo: autor.docente.vinculo };
+  if (autor.discente) return { id_autor: autor.id_autor, tipo: "DISCENTE", nome: autor.discente.nome };
+  return { id_autor: autor.id_autor, tipo: "EXTERNO", nome: autor.externo?.nome ?? autor.nome_citacao };
+}
 
 const VINCULOS = ["PERMANENTE", "COLABORADOR"];
 
@@ -182,6 +191,53 @@ function criarRotasDocentes({ prisma }) {
       const { count } = await prisma.autorNomeCitacao.deleteMany({ where: { id_nome_citacao: idNome, id_autor: autor.id_autor } });
       if (!count) throw Erros.naoEncontrado("Variação de nome não encontrada para este docente.");
       res.status(204).end();
+    },
+  );
+
+  rotas.get(
+    "/:id/publicacoes",
+    validar({
+      params: paramsId,
+      query: z
+        .object({ inicio: z.coerce.number().int().min(1950).max(2100).optional(), fim: z.coerce.number().int().min(1950).max(2100).optional() })
+        .refine((q) => !q.inicio || !q.fim || q.inicio <= q.fim, "O ano inicial não pode ser maior que o final."),
+    }),
+    async (req, res) => {
+      const { id: idDocente } = req.validado.params;
+      const { inicio, fim } = req.validado.query;
+      const autor = await exigir(prisma.autor.findUnique({ where: { id_docente: idDocente } }), "Docente não encontrado.");
+
+      const publicacoes = await prisma.publicacao.findMany({
+        where: {
+          autorias: { some: { id_autor: autor.id_autor } },
+          ano_publicacao: { ...(inicio ? { gte: inicio } : {}), ...(fim ? { lte: fim } : {}) },
+        },
+        orderBy: [{ ano_publicacao: "desc" }, { titulo: "asc" }],
+        include: {
+          veiculo: { include: { estratos: true } },
+          autorias: {
+            orderBy: { ordem_autoria: "asc" },
+            include: { autor: { include: { docente: true, discente: true, externo: true } } },
+          },
+        },
+      });
+
+      res.json(
+        publicacoes.map((p) => {
+          const vigente = p.veiculo ? estratoVigente(p.veiculo.estratos, AREA_PADRAO) : null;
+          return {
+            id_publicacao: p.id_publicacao,
+            titulo: p.titulo,
+            ano: p.ano_publicacao,
+            doi: p.doi,
+            veiculo: p.veiculo && { id_veiculo: p.veiculo.id_veiculo, nome: p.veiculo.nome, issn_sigla: p.veiculo.issn_sigla, tipo: p.veiculo.tipo },
+            estrato: vigente?.estrato ?? null,
+            fonte_estrato: vigente?.fonte ?? null,
+            ano_base_estrato: vigente?.ano_base ?? null,
+            coautores: p.autorias.filter((a) => a.id_autor !== autor.id_autor).map((a) => descreverAutor(a.autor)),
+          };
+        }),
+      );
     },
   );
 
