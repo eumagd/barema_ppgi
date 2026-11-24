@@ -7,7 +7,8 @@ services:
       POSTGRES_PASSWORD: ppgi
       POSTGRES_DB: barema_ppgi
     ports:
-      - "5432:5432"
+      # DB_PORT no .env permite outra porta se já houver um PostgreSQL local na 5432.
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - barema_ppgi_data:/var/lib/postgresql/data
 
