@@ -96,11 +96,20 @@ describe("importação do QLattes no PostgreSQL", { skip: pular }, () => {
     zip.addFile("__MACOSX/._bruno.csv", Buffer.from("lixo"));
 
     const res = await enviar(zip.toBuffer(), "lote.zip");
-    assert.equal(res.status, 207, JSON.stringify(res.body));
-    const porArquivo = Object.fromEntries(res.body.resultados.map((r) => [r.arquivo, r]));
+    assert.equal(res.status, 202, JSON.stringify(res.body));
+    assert.equal(res.body.total, 2);
+    // Processado em segundo plano: acompanha até terminar.
+    let lote;
+    for (let i = 0; i < 100; i++) {
+      lote = (await api.get(`/api/importacoes/lotes/${res.body.id_lote}`)).body;
+      if (["CONCLUIDO", "FALHA"].includes(lote.status)) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.equal(lote.status, "CONCLUIDO");
+    const porArquivo = Object.fromEntries(lote.itens.map((r) => [r.arquivo, r]));
     assert.equal(Object.keys(porArquivo).length, 2);
     assert.equal(porArquivo["bruno_m_lima.csv"].status, "CONCLUIDO");
-    assert.equal(porArquivo["bruno_m_lima.csv"].importacao.contagens.coautoria_com_outro_docente, 1);
+    assert.equal(porArquivo["bruno_m_lima.csv"].contagens.coautoria_com_outro_docente, 1);
     assert.equal(porArquivo["desconhecido.csv"].status, "FALHA");
     assert.match(porArquivo["desconhecido.csv"].erro, /Nenhum docente/);
 

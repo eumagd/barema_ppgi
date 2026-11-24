@@ -468,6 +468,7 @@ model Usuario {
   criado_em  DateTime      @default(now())
 
   tokens_redefinicao TokenRedefinicaoSenha[]
+  lotes_importacao   LoteImportacao[]
   importacoes        Importacao[]
   correspondencias   Correspondencia[]
 
@@ -582,4 +583,23 @@ model Correspondencia {
   @@index([decisao, nota])
   @@index([id_publicacao])
   @@map("correspondencia")
+}
+
+/// Importação em lote (.zip com vários CSVs), processada em segundo plano (RF-BE13, RNF-BE04).
+/// `itens` guarda o andamento de cada arquivo: [{ arquivo, status, docente?, id_importacao?, erro? }].
+model LoteImportacao {
+  id_lote       Int              @id @default(autoincrement())
+  nome_arquivo  String           @db.VarChar(255)
+  status        StatusImportacao @default(PENDENTE)
+  total         Int
+  itens         Json
+  id_usuario    Int?
+  criado_em     DateTime         @default(now())
+  iniciado_em   DateTime?
+  finalizado_em DateTime?
+
+  usuario Usuario? @relation(fields: [id_usuario], references: [id_usuario], onDelete: SetNull)
+
+  @@index([status])
+  @@map("lote_importacao")
 }

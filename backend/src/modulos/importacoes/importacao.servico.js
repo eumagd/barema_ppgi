@@ -262,20 +262,60 @@ function criarServicoImportacao({ prisma }) {
     }
   }
 
-  /** .csv individual (exige id_docente) ou .zip com vários .csv (casa cada um pelo conteúdo). */
+  /**
+   * Processa os arquivos de um lote, um por vez, gravando o andamento de cada docente em
+   * lote_importacao.itens (pendente → processando → concluído/falha) para a tela acompanhar.
+   */
+  async function processarLote(idLote, arquivos, idUsuario) {
+    const itens = arquivos.map((a) => ({ arquivo: a.nome, status: "PENDENTE" }));
+    const salvar = (dados) => prisma.loteImportacao.update({ where: { id_lote: idLote }, data: { itens, ...dados } });
+    await salvar({ status: "PROCESSANDO", iniciado_em: new Date() });
+
+    for (const [i, arquivo] of arquivos.entries()) {
+      itens[i] = { ...itens[i], status: "PROCESSANDO" };
+      await salvar({});
+      try {
+        const r = await importarArquivo({ buffer: arquivo.buffer, nomeArquivo: arquivo.nome, idUsuario });
+        itens[i] = {
+          arquivo: arquivo.nome,
+          status: r.reaproveitada ? "REAPROVEITADO" : "CONCLUIDO",
+          docente: resumoDocente(r.docente),
+          id_importacao: r.importacao.id_importacao,
+          contagens: r.importacao.contagens,
+        };
+      } catch (erro) {
+        // Erro inesperado (banco fora do ar etc.) também vira falha do arquivo, com mensagem clara.
+        itens[i] = { arquivo: arquivo.nome, status: "FALHA", erro: erro.status ? erro.message : "Erro inesperado ao processar o arquivo." };
+        if (!erro.status) console.error(erro);
+      }
+      await salvar({});
+    }
+    const falhas = itens.filter((x) => x.status === "FALHA").length;
+    await salvar({ status: falhas === itens.length ? "FALHA" : "CONCLUIDO", finalizado_em: new Date() });
+  }
+
+  /** Um lote por vez, para não disputar o banco com o Fuzzy Match de outro lote. */
+  let fila = Promise.resolve();
+  function enfileirar(tarefa) {
+    const execucao = fila.then(tarefa, tarefa);
+    fila = execucao.catch((erro) => console.error("Falha no lote de importação:", erro));
+    return execucao;
+  }
+
+  /** .csv individual (síncrono, exige id_docente) ou .zip (assíncrono: devolve o lote para acompanhar). */
   async function importar({ buffer, nomeArquivo, idDocente, confirmarNome, idUsuario }) {
     if (/\.zip$/i.test(nomeArquivo)) {
-      const resultados = [];
-      for (const arquivo of extrairZip(buffer)) {
-        try {
-          const r = await importarArquivo({ buffer: arquivo.buffer, nomeArquivo: arquivo.nome, idUsuario });
-          resultados.push({ arquivo: arquivo.nome, status: r.reaproveitada ? "REAPROVEITADO" : "CONCLUIDO", docente: resumoDocente(r.docente), importacao: r.importacao });
-        } catch (erro) {
-          if (!erro.status) throw erro;
-          resultados.push({ arquivo: arquivo.nome, status: "FALHA", erro: erro.message });
-        }
-      }
-      return { lote: true, resultados };
+      const arquivos = extrairZip(buffer);
+      const lote = await prisma.loteImportacao.create({
+        data: {
+          nome_arquivo: nomeArquivo.slice(0, 255),
+          total: arquivos.length,
+          itens: arquivos.map((a) => ({ arquivo: a.nome, status: "PENDENTE" })),
+          id_usuario: idUsuario ?? null,
+        },
+      });
+      const concluido = enfileirar(() => processarLote(lote.id_lote, arquivos, idUsuario));
+      return { lote: true, assincrono: true, id_lote: lote.id_lote, status: lote.status, total: lote.total, itens: lote.itens, concluido };
     }
 
     if (!idDocente) throw Erros.requisicaoInvalida("Informe o docente (id_docente) para importar um CSV individual.");
@@ -283,7 +323,19 @@ function criarServicoImportacao({ prisma }) {
     return { lote: false, reaproveitada: r.reaproveitada, docente: resumoDocente(r.docente), importacao: r.importacao };
   }
 
-  return { importar };
+  /** Lotes que estavam em andamento quando o servidor parou não têm mais os arquivos: marcamos como falha. */
+  async function encerrarLotesInterrompidos() {
+    const presos = await prisma.loteImportacao.findMany({ where: { status: { in: ["PENDENTE", "PROCESSANDO"] } } });
+    for (const lote of presos) {
+      const itens = lote.itens.map((x) =>
+        ["PENDENTE", "PROCESSANDO"].includes(x.status) ? { ...x, status: "FALHA", erro: "O servidor foi reiniciado durante o processamento. Envie o arquivo de novo." } : x,
+      );
+      await prisma.loteImportacao.update({ where: { id_lote: lote.id_lote }, data: { status: "FALHA", itens, finalizado_em: new Date() } });
+    }
+    return presos.length;
+  }
+
+  return { importar, encerrarLotesInterrompidos };
 }
 
 const resumoDocente = (d) => ({ id_docente: d.id_docente, nome: d.nome });

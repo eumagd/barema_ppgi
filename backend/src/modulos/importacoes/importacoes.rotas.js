@@ -4,6 +4,7 @@
  *                              id_docente (obrigatório para .csv), confirmar_nome? (true/false)
  *   GET  /api/importacoes      ?id_docente=&status=  histórico (só cargas de currículo)
  *   GET  /api/importacoes/:id  detalhe com contagens e erros por linha
+ *   GET  /api/importacoes/lotes/:id  andamento de um .zip (202 no POST; processado em segundo plano)
  */
 const { Router } = require("express");
 const { z } = require("zod");
@@ -40,8 +41,17 @@ function criarRotasImportacoes({ prisma }) {
       confirmarNome,
       idUsuario: req.usuario.id,
     });
-    const status = resultado.lote ? 207 : resultado.reaproveitada ? 200 : 201;
-    res.status(status).json(resultado);
+    const { concluido, ...corpo } = resultado;
+    void concluido;
+    const status = resultado.lote ? 202 : resultado.reaproveitada ? 200 : 201;
+    res.status(status).json(corpo);
+  });
+
+  /** Andamento de um lote (.zip): status geral e de cada arquivo/docente. */
+  rotas.get("/lotes/:id", validar({ params: z.object({ id: z.coerce.number().int().positive() }) }), async (req, res) => {
+    const lote = await prisma.loteImportacao.findUnique({ where: { id_lote: req.validado.params.id } });
+    if (!lote) throw Erros.naoEncontrado("Lote não encontrado.");
+    res.json(lote);
   });
 
   rotas.get(
