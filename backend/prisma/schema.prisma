@@ -92,6 +92,71 @@ enum PerfilUsuario {
   @@map("perfil_usuario")
 }
 
+/// Origem do estrato Qualis (RF-BE17), na ordem de busca: CAPES → PUC-RS → Scopus.
+/// EVENTOS = tabela Qualis Eventos da Computação; MANUAL = fila de classificação manual (RF-BE05).
+enum FonteQualis {
+  CAPES
+  PUC_RS
+  SCOPUS
+  EVENTOS
+  MANUAL
+
+  @@map("fonte_qualis")
+}
+
+/// Conector que originou a carga (RF-BE18).
+enum FonteImportacao {
+  QLATTES_CSV
+  PLANILHA_TRANSICAO
+  XML_LATTES
+
+  @@map("fonte_importacao")
+}
+
+enum StatusImportacao {
+  PENDENTE
+  PROCESSANDO
+  CONCLUIDO
+  FALHA
+
+  @@map("status_importacao")
+}
+
+/// O que foi comparado no Fuzzy Match.
+enum TipoCorrespondencia {
+  PUBLICACAO
+  AUTOR
+
+  @@map("tipo_correspondencia")
+}
+
+/// Etapa do pipeline que gerou a nota (RF-BE07 a RF-BE10).
+enum MotivoCorrespondencia {
+  DOI
+  ISSN_TITULO
+  SIMILARIDADE_TITULO
+  NOME_AUTOR
+
+  @@map("motivo_correspondencia")
+}
+
+/// AUTOMATICA = nota ≥ corte de confirmação; PENDENTE = faixa de revisão humana.
+enum DecisaoCorrespondencia {
+  AUTOMATICA
+  PENDENTE
+  CONFIRMADA
+  REJEITADA
+
+  @@map("decisao_correspondencia")
+}
+
+enum NivelDisciplina {
+  GRADUACAO
+  POS_GRADUACAO
+
+  @@map("nivel_disciplina")
+}
+
 // ---------------------------------------------------------------------
 // Pessoas
 // ---------------------------------------------------------------------
@@ -102,9 +167,13 @@ model Docente {
   nome                     String       @db.VarChar(150)
   email                    String       @unique @db.VarChar(150)
   url_lattes               String?      @db.VarChar(255)
+  /// ID do Lattes (16 dígitos): sustenta a validação de vínculo da importação (RF-BE03).
+  id_lattes                String?      @unique @db.Char(16)
   data_ultima_atualizacao  DateTime?    @db.Date
   /// Mapeamento da especialização PERMANENTE/COLABORADOR em tabela única.
   vinculo                  VinculoPpgi?
+  /// Início do vínculo atual com o PPGI: recém-credenciados (< 24 meses) e progressão Colaborador → Permanente.
+  data_vinculo             DateTime?    @db.Date
   /// RF16: data em que o docente declarou que não participará do ciclo.
   data_recusa_participacao DateTime?    @db.Date
 
@@ -112,17 +181,21 @@ model Docente {
   coorientacoes Coorientacao[]
   autor         Autor?
   avaliacoes    Avaliacao[]
+  turmas        Turma[]
+  importacoes   Importacao[]
 
   @@map("docente")
 }
 
 model Discente {
-  id_discente   Int    @id @default(autoincrement())
-  matricula     String @unique @db.VarChar(20)
-  nome          String @db.VarChar(150)
-  ano_ingresso  Int
+  id_discente    Int       @id @default(autoincrement())
+  matricula      String    @unique @db.VarChar(20)
+  nome           String    @db.VarChar(150)
+  ano_ingresso   Int
+  /// Data da defesa; nula = orientação em andamento (critério de Orientação, janela de 24 meses).
+  data_conclusao DateTime? @db.Date
   /// Relacionamento Orienta (PERMANENTE 1 : N DISCENTE, máx. 8) — validado por gatilho.
-  id_orientador Int?
+  id_orientador  Int?
 
   orientador    Docente?       @relation("Orienta", fields: [id_orientador], references: [id_docente], onDelete: SetNull)
   coorientacoes Coorientacao[]
@@ -168,12 +241,30 @@ model Autor {
   id_discente  Int?      @unique
   id_externo   Int?      @unique
 
-  docente  Docente?  @relation(fields: [id_docente], references: [id_docente], onDelete: Cascade)
-  discente Discente? @relation(fields: [id_discente], references: [id_discente], onDelete: Cascade)
-  externo  Externo?  @relation(fields: [id_externo], references: [id_externo], onDelete: Cascade)
-  autorias Autoria[]
+  docente          Docente?           @relation(fields: [id_docente], references: [id_docente], onDelete: Cascade)
+  discente         Discente?          @relation(fields: [id_discente], references: [id_discente], onDelete: Cascade)
+  externo          Externo?           @relation(fields: [id_externo], references: [id_externo], onDelete: Cascade)
+  autorias         Autoria[]
+  /// Variações do nome de citação ("SANTOS, M.", "Magdiel Santos"...) — RF-BE09.
+  nomes_citacao    AutorNomeCitacao[]
+  correspondencias Correspondencia[]
 
   @@map("autor")
+}
+
+/// Variação de nome de citação de um autor, usada para casar coautores do CSV (RF-BE09).
+model AutorNomeCitacao {
+  id_nome_citacao  Int    @id @default(autoincrement())
+  id_autor         Int
+  nome             String @db.VarChar(255)
+  /// Minúsculas, sem acentos e sem pontuação.
+  nome_normalizado String @db.VarChar(255)
+
+  autor Autor @relation(fields: [id_autor], references: [id_autor], onDelete: Cascade)
+
+  @@unique([id_autor, nome_normalizado])
+  @@index([nome_normalizado])
+  @@map("autor_nome_citacao")
 }
 
 // ---------------------------------------------------------------------
@@ -198,9 +289,13 @@ model Veiculo {
 model EstratoQualis {
   id_veiculo      Int
   ano_base        Int
-  area_de_atuacao String  @db.VarChar(100)
+  area_de_atuacao String      @db.VarChar(100)
   estrato         Estrato
-  pontuacao       Decimal @db.Decimal(6, 2)
+  pontuacao       Decimal     @db.Decimal(6, 2)
+  /// Origem do estrato, exibida no perfil como no QLattes (RF-BE17).
+  fonte           FonteQualis @default(CAPES)
+  /// Obrigatória quando fonte = MANUAL (fila de classificação de Qualis "N").
+  justificativa   String?     @db.Text
 
   veiculo Veiculo @relation(fields: [id_veiculo], references: [id_veiculo], onDelete: Cascade)
 
@@ -209,20 +304,31 @@ model EstratoQualis {
 }
 
 model Publicacao {
-  id_publicacao   Int      @id @default(autoincrement())
-  titulo          String   @db.VarChar(500)
-  ano_publicacao  Int
+  id_publicacao      Int      @id @default(autoincrement())
+  titulo             String   @db.VarChar(500)
+  /// Minúsculas, sem acentos e sem pontuação; índice GIN pg_trgm para o Fuzzy Match.
+  titulo_normalizado String?  @db.VarChar(500)
+  doi                String?  @db.VarChar(255)
+  ano_publicacao     Int
   /// Grau de correspondência (0–100) devolvido pelo Fuzzy Match.
-  correspondencia Decimal? @db.Decimal(5, 2)
+  correspondencia    Decimal? @db.Decimal(5, 2)
   /// Relacionamento Publicada Em (N:1).
-  id_veiculo      Int?
+  id_veiculo         Int?
+  /// Carga que trouxe a publicação (rastreabilidade, RF-BE16).
+  id_importacao      Int?
 
-  veiculo    Veiculo?              @relation(fields: [id_veiculo], references: [id_veiculo], onDelete: SetNull)
-  autorias   Autoria[]
-  avaliacoes AvaliacaoPublicacao[]
+  veiculo                    Veiculo?              @relation(fields: [id_veiculo], references: [id_veiculo], onDelete: SetNull)
+  importacao                 Importacao?           @relation(fields: [id_importacao], references: [id_importacao], onDelete: SetNull)
+  autorias                   Autoria[]
+  avaliacoes                 AvaliacaoPublicacao[]
+  correspondencias_origem    Correspondencia[]     @relation("CorrespondenciaOrigem")
+  correspondencias_candidata Correspondencia[]     @relation("CorrespondenciaCandidata")
 
   @@index([id_veiculo])
   @@index([ano_publicacao])
+  @@index([doi])
+  @@index([id_importacao])
+  @@index([titulo_normalizado(ops: raw("gin_trgm_ops"))], type: Gin, map: "publicacao_titulo_normalizado_trgm_idx")
   @@map("publicacao")
 }
 
@@ -253,8 +359,25 @@ model Resolucao {
   link_documento String?  @db.VarChar(500)
 
   avaliacoes Avaliacao[]
+  parametros Parametro[]
 
   @@map("resolucao")
+}
+
+/// Parâmetros versionados por resolução: pesos por estrato, mínimos exigidos e cortes do
+/// Fuzzy Match, ajustáveis sem novo deploy (RNF-BE05).
+model Parametro {
+  id_parametro Int     @id @default(autoincrement())
+  id_resolucao Int
+  /// Ex.: "pesos_estrato", "credenciamento.pontuacao_minima", "fuzzy.corte_confirmacao".
+  chave        String  @db.VarChar(100)
+  valor        Json
+  descricao    String? @db.VarChar(500)
+
+  resolucao Resolucao @relation(fields: [id_resolucao], references: [id_resolucao], onDelete: Cascade)
+
+  @@unique([id_resolucao, chave])
+  @@map("parametro")
 }
 
 /// AVALIACAO e suas subclasses CREDENCIAMENTO/RECREDENCIAMENTO em tabela única.
@@ -313,5 +436,116 @@ model Usuario {
   perfil     PerfilUsuario
   criado_em  DateTime      @default(now())
 
+  tokens_redefinicao TokenRedefinicaoSenha[]
+  importacoes        Importacao[]
+  correspondencias   Correspondencia[]
+
   @@map("usuario")
+}
+
+/// Token temporário enviado por e-mail na recuperação de senha (guardamos só o hash).
+model TokenRedefinicaoSenha {
+  id_token   Int       @id @default(autoincrement())
+  id_usuario Int
+  token_hash String    @unique @db.VarChar(128)
+  expira_em  DateTime
+  usado_em   DateTime?
+  criado_em  DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  @@index([id_usuario])
+  @@map("token_redefinicao_senha")
+}
+
+// ---------------------------------------------------------------------
+// Docência (critério do recredenciamento, RF09)
+// ---------------------------------------------------------------------
+
+model Disciplina {
+  id_disciplina   Int             @id @default(autoincrement())
+  codigo          String          @unique @db.VarChar(20)
+  nome            String          @db.VarChar(200)
+  nivel           NivelDisciplina
+  /// "Estudo Dirigido" não conta para o critério de Docência.
+  estudo_dirigido Boolean         @default(false)
+
+  turmas Turma[]
+
+  @@map("disciplina")
+}
+
+/// Disciplina ministrada por um docente em um semestre.
+model Turma {
+  id_turma      Int @id @default(autoincrement())
+  id_disciplina Int
+  id_docente    Int
+  ano           Int
+  semestre      Int
+
+  disciplina Disciplina @relation(fields: [id_disciplina], references: [id_disciplina], onDelete: Cascade)
+  docente    Docente    @relation(fields: [id_docente], references: [id_docente], onDelete: Cascade)
+
+  @@unique([id_disciplina, id_docente, ano, semestre])
+  @@index([id_docente, ano])
+  @@map("turma")
+}
+
+// ---------------------------------------------------------------------
+// Ingestão e Fuzzy Match
+// ---------------------------------------------------------------------
+
+/// Cada carga de arquivo (RF-BE16): fonte, hash para idempotência, estado e contagens.
+model Importacao {
+  id_importacao Int              @id @default(autoincrement())
+  fonte         FonteImportacao
+  nome_arquivo  String           @db.VarChar(255)
+  /// SHA-256 do arquivo: reimportar o mesmo arquivo não duplica dados (RNF-BE02).
+  hash_arquivo  String           @db.Char(64)
+  status        StatusImportacao @default(PENDENTE)
+  /// Ex.: { "linhas": 120, "publicacoes_novas": 30, "duplicadas": 85, "erros": 5 }.
+  contagens     Json?
+  erros         Json?
+  /// Docente do upload individual; nulo em lote (casado por linha/arquivo).
+  id_docente    Int?
+  id_usuario    Int?
+  criado_em     DateTime         @default(now())
+  iniciado_em   DateTime?
+  finalizado_em DateTime?
+
+  docente     Docente?     @relation(fields: [id_docente], references: [id_docente], onDelete: SetNull)
+  usuario     Usuario?     @relation(fields: [id_usuario], references: [id_usuario], onDelete: SetNull)
+  publicacoes Publicacao[]
+
+  @@index([hash_arquivo])
+  @@index([status])
+  @@map("importacao")
+}
+
+/// Par comparado no Fuzzy Match, com nota, motivo e decisão (RF-BE11).
+/// Publicação × publicação candidata, ou nome lido no CSV × autor cadastrado.
+model Correspondencia {
+  id_correspondencia      Int                    @id @default(autoincrement())
+  tipo                    TipoCorrespondencia
+  id_publicacao           Int
+  id_publicacao_candidata Int?
+  /// Nome do coautor como veio no CSV (tipo = AUTOR).
+  nome_lido               String?                @db.VarChar(255)
+  id_autor_candidato      Int?
+  nota                    Decimal                @db.Decimal(5, 2)
+  motivo                  MotivoCorrespondencia
+  decisao                 DecisaoCorrespondencia @default(PENDENTE)
+  justificativa           String?                @db.Text
+  id_usuario              Int?
+  decidido_em             DateTime?
+  criado_em               DateTime               @default(now())
+
+  publicacao           Publicacao  @relation("CorrespondenciaOrigem", fields: [id_publicacao], references: [id_publicacao], onDelete: Cascade)
+  publicacao_candidata Publicacao? @relation("CorrespondenciaCandidata", fields: [id_publicacao_candidata], references: [id_publicacao], onDelete: Cascade)
+  autor_candidato      Autor?      @relation(fields: [id_autor_candidato], references: [id_autor], onDelete: Cascade)
+  usuario              Usuario?    @relation(fields: [id_usuario], references: [id_usuario], onDelete: SetNull)
+
+  @@index([decisao, nota])
+  @@index([id_publicacao])
+  @@map("correspondencia")
 }
