@@ -7,8 +7,13 @@ const crypto = require("node:crypto");
 
 const prisma = new PrismaClient();
 
-/* Pontuação por estrato (Resolução nº 1/2025), igual ao front end. */
-const QUALIS_POINTS = { A1: 100, A2: 85, A3: 70, A4: 55, B1: 40, B2: 25, B3: 12.5, B4: 5 };
+/* Mesma regra de fn_normaliza_texto (migração 20261124120500). */
+function normalizar(texto) {
+  return String(texto).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/* Pontuação por estrato e demais parâmetros da Resolução nº 1/2025 (fonte única no back end). */
+const { PESOS_ESTRATO: QUALIS_POINTS, PARAMETROS } = require("../src/dominio/parametros-resolucao-1-2025");
 const PERIODO = [2023, 2024, 2025];
 const ANO_BASE_QUALIS = 2024;
 const AREA = "Ciência da Computação";
@@ -59,6 +64,7 @@ const PUBLICACOES = [
 
 async function limpar() {
   // Ordem inversa das dependências.
+  await prisma.correspondencia.deleteMany();
   await prisma.avaliacaoPublicacao.deleteMany();
   await prisma.avaliacao.deleteMany();
   await prisma.autoria.deleteMany();
@@ -70,7 +76,12 @@ async function limpar() {
   await prisma.discente.deleteMany();
   await prisma.externo.deleteMany();
   await prisma.docente.deleteMany();
+  await prisma.importacao.deleteMany();
+  await prisma.turma.deleteMany();
+  await prisma.disciplina.deleteMany();
+  await prisma.parametro.deleteMany();
   await prisma.resolucao.deleteMany();
+  await prisma.tokenRedefinicaoSenha.deleteMany();
   await prisma.usuario.deleteMany();
 }
 
@@ -93,6 +104,10 @@ async function main() {
     },
   });
 
+  await prisma.parametro.createMany({
+    data: PARAMETROS.map((p) => ({ ...p, id_resolucao: resolucao.id_resolucao })),
+  });
+
   /* Docentes + seus registros na categoria AUTOR. */
   const docentes = {};
   const autores = {};
@@ -104,7 +119,13 @@ async function main() {
         email: d.email,
         vinculo: d.vinculo,
         data_ultima_atualizacao: new Date("2026-09-11"),
-        autor: { create: { tipo: "DOCENTE", nome_citacao: d.citacao } },
+        autor: {
+          create: {
+            tipo: "DOCENTE",
+            nome_citacao: d.citacao,
+            nomes_citacao: { create: [{ nome: d.citacao, nome_normalizado: normalizar(d.citacao) }] },
+          },
+        },
       },
       include: { autor: true },
     });
@@ -140,7 +161,13 @@ async function main() {
         issn_sigla: v.issn_sigla,
         tipo: v.tipo,
         estratos: {
-          create: { ano_base: ANO_BASE_QUALIS, area_de_atuacao: AREA, estrato: v.estrato, pontuacao: QUALIS_POINTS[v.estrato] },
+          create: {
+            ano_base: ANO_BASE_QUALIS,
+            area_de_atuacao: AREA,
+            estrato: v.estrato,
+            pontuacao: QUALIS_POINTS[v.estrato],
+            fonte: v.tipo === "CONFERENCIA" ? "EVENTOS" : "CAPES",
+          },
         },
       },
     });
@@ -152,6 +179,7 @@ async function main() {
     const pub = await prisma.publicacao.create({
       data: {
         titulo: p.titulo,
+        titulo_normalizado: normalizar(p.titulo),
         ano_publicacao: p.ano,
         correspondencia: p.correspondencia ?? null,
         id_veiculo: veiculos[p.veiculo].id_veiculo,
@@ -202,7 +230,7 @@ async function main() {
     },
   });
 
-  console.log(`Seed concluído: ${DOCENTES.length} docentes, ${PUBLICACOES.length} publicações, 2 avaliações.`);
+  console.log(`Seed concluído: ${DOCENTES.length} docentes, ${PUBLICACOES.length} publicações, 2 avaliações, ${PARAMETROS.length} parâmetros.`);
 }
 
 main()
