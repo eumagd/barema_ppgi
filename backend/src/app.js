@@ -23,6 +23,7 @@ const { rotaNaoEncontrada, tratarErros } = require("./middlewares/erros");
 
 function criarApp({ prisma, email }) {
   const app = express();
+  app.locals.prisma = prisma;
 
   app.disable("x-powered-by");
   app.set("trust proxy", "loopback");

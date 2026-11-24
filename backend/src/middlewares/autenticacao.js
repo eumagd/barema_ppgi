@@ -15,16 +15,28 @@ function emitirToken(usuario) {
   });
 }
 
-function autenticar(req, _res, next) {
+/**
+ * Valida o token e confere se o usuário ainda existe (e com o mesmo perfil): um usuário
+ * removido ou com perfil alterado não continua usando uma sessão antiga.
+ * O Prisma vem de app.locals.prisma (definido em criarApp).
+ */
+async function autenticar(req, _res, next) {
   const [tipo, token] = String(req.headers.authorization || "").split(" ");
   if (tipo !== "Bearer" || !token) return next(Erros.naoAutenticado());
+  let dados;
   try {
-    const dados = jwt.verify(token, config.jwt.segredo);
-    req.usuario = { id: Number(dados.sub), perfil: dados.perfil, nome: dados.nome };
-    return next();
+    dados = jwt.verify(token, config.jwt.segredo);
   } catch (erro) {
     const expirou = erro instanceof jwt.TokenExpiredError;
     return next(Erros.naoAutenticado(expirou ? "Sua sessão expirou. Faça login novamente." : "Sessão inválida. Faça login novamente."));
+  }
+  try {
+    const usuario = await req.app.locals.prisma.usuario.findUnique({ where: { id_usuario: Number(dados.sub) } });
+    if (!usuario || usuario.perfil !== dados.perfil) return next(Erros.naoAutenticado("Sessão inválida. Faça login novamente."));
+    req.usuario = { id: usuario.id_usuario, perfil: usuario.perfil, nome: usuario.nome };
+    return next();
+  } catch (erro) {
+    return next(erro);
   }
 }
 

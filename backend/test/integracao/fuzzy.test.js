@@ -107,6 +107,19 @@ describe("Fuzzy Match no PostgreSQL", { skip: pular }, () => {
     assert.deepEqual(titulosCom(await producao(bruno), "Ana Souza"), ["Deep learning para detecção de anomalias: um survey"], JSON.stringify(await producao(bruno), null, 1));
   });
 
+  it("pendência obsoleta (publicação já mesclada em outra) sai da fila", async () => {
+    const prisma = obterPrisma();
+    const [a, b, c] = await prisma.publicacao.findMany({ where: { id_mesclada_em: null }, orderBy: { id_publicacao: "asc" }, take: 3 });
+    const pendente = await prisma.correspondencia.create({
+      data: { tipo: "PUBLICACAO", id_publicacao: c.id_publicacao, id_publicacao_candidata: b.id_publicacao, nota: 85, motivo: "SIMILARIDADE_TITULO" },
+    });
+    assert.ok((await api.get("/api/correspondencias?faixa=revisao")).body.some((x) => x.id_correspondencia === pendente.id_correspondencia));
+    await prisma.publicacao.update({ where: { id_publicacao: c.id_publicacao }, data: { id_mesclada_em: a.id_publicacao } });
+    assert.ok(!(await api.get("/api/correspondencias?faixa=revisao")).body.some((x) => x.id_correspondencia === pendente.id_correspondencia));
+    await prisma.publicacao.update({ where: { id_publicacao: c.id_publicacao }, data: { id_mesclada_em: null } });
+    await prisma.correspondencia.delete({ where: { id_correspondencia: pendente.id_correspondencia } });
+  });
+
   it("filtra a fila por docente e valida a decisão", async () => {
     const daAna = (await api.get(`/api/correspondencias?faixa=todas&id_docente=${ana.id_docente}`)).body;
     assert.equal(daAna.length, 3);

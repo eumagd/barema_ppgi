@@ -55,6 +55,7 @@ e-mail; sem SMTP configurado no back end, o link aparece no console da API.
 | `verificacao.html?d=<id>` | Verificação de requisitos (exporta CSV) |
 | `relatorios.html?d=<id>` | Relatório do docente (PDF pela impressão, envio por e-mail) |
 | `credenciamento.html` | Credenciamento/recredenciamento individual ou em lote, com conferência dos requisitos. Também `?d=<id>` (aba do docente) e `?modo=lote` |
+| `revisao.html` | Revisão: coautorias do Fuzzy Match (confirmar, rejeitar, desfazer mescla, reprocessar) e veículos sem estrato Qualis (classificação manual com justificativa). Atalho: `?aba=qualis` |
 
 `<id>` é o número do docente no banco (`id_docente`).
 

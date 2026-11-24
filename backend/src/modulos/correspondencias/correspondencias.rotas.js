@@ -51,6 +51,11 @@ function criarRotasCorrespondencias({ prisma }) {
           tipo: "PUBLICACAO",
           ...FAIXAS[faixa],
           ...(doDocente ? { OR: [{ publicacao: doDocente }, { publicacao_candidata: doDocente }] } : {}),
+          // Pendente cuja publicação já foi mesclada em outra ficou obsoleta: não há mais o que decidir.
+          NOT: {
+            decisao: "PENDENTE",
+            OR: [{ publicacao: { id_mesclada_em: { not: null } } }, { publicacao_candidata: { id_mesclada_em: { not: null } } }],
+          },
         },
         orderBy: [{ nota: "desc" }, { id_correspondencia: "asc" }],
         include: { publicacao: resumoPublicacao, publicacao_candidata: resumoPublicacao, usuario: { select: { nome: true } } },

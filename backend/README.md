@@ -255,4 +255,3 @@ backend/
 
 - Calibrar os cortes do Fuzzy Match com a planilha histórica.
 - Importação da planilha de transição (`Credenciamento2026.xlsx`), quando o layout estiver disponível.
-- Tela para a fila manual de Qualis "N" e para a fila de revisão completa do Fuzzy Match (as rotas já existem).

@@ -15,6 +15,7 @@
     { key: "painel", label: "Painel", href: "painel.html", icon: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>' },
     { key: "docentes", label: "Docentes", href: "professores.html", icon: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5-4-6"/>' },
     { key: "credenciamento", label: "Credenciamento", href: "credenciamento.html", icon: '<path d="M9 12l2 2 4-4"/><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/>' },
+    { key: "revisao", label: "Revisão", href: "revisao.html", icon: '<path d="M4 6h16M4 12h10M4 18h7"/><circle cx="17" cy="16" r="3"/><path d="M19.5 18.5L22 21"/>' },
   ];
 
   /* ---------- Acesso ---------- */
