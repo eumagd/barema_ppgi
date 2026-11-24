@@ -161,7 +161,13 @@ async function main() {
         issn_sigla: v.issn_sigla,
         tipo: v.tipo,
         estratos: {
-          create: { ano_base: ANO_BASE_QUALIS, area_de_atuacao: AREA, estrato: v.estrato, pontuacao: QUALIS_POINTS[v.estrato] },
+          create: {
+            ano_base: ANO_BASE_QUALIS,
+            area_de_atuacao: AREA,
+            estrato: v.estrato,
+            pontuacao: QUALIS_POINTS[v.estrato],
+            fonte: v.tipo === "CONFERENCIA" ? "EVENTOS" : "CAPES",
+          },
         },
       },
     });

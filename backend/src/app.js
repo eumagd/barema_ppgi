@@ -7,6 +7,7 @@ const cors = require("cors");
 const config = require("./config");
 const { criarRotasAuth } = require("./modulos/auth/auth.rotas");
 const { criarRotasParametros } = require("./modulos/parametros/parametros.rotas");
+const { criarRotasQualis } = require("./modulos/qualis/qualis.rotas");
 const { rotaNaoEncontrada, tratarErros } = require("./middlewares/erros");
 
 function criarApp({ prisma, email }) {
@@ -29,6 +30,7 @@ function criarApp({ prisma, email }) {
 
   app.use("/api/auth", criarRotasAuth({ prisma, email }));
   app.use("/api/resolucoes", criarRotasParametros({ prisma }));
+  app.use("/api/qualis", criarRotasQualis({ prisma }));
 
   app.use(rotaNaoEncontrada);
   app.use(tratarErros);

@@ -109,6 +109,11 @@ enum FonteImportacao {
   QLATTES_CSV
   PLANILHA_TRANSICAO
   XML_LATTES
+  /// Cargas das tabelas Qualis (POST /api/qualis/cargas).
+  QUALIS_CAPES
+  QUALIS_PUC_RS
+  QUALIS_SCOPUS
+  QUALIS_EVENTOS
 
   @@map("fonte_importacao")
 }
@@ -296,10 +301,18 @@ model EstratoQualis {
   fonte           FonteQualis @default(CAPES)
   /// Obrigatória quando fonte = MANUAL (fila de classificação de Qualis "N").
   justificativa   String?     @db.Text
+  /// Carga que trouxe este estrato (nula para classificação manual).
+  id_importacao   Int?
 
-  veiculo Veiculo @relation(fields: [id_veiculo], references: [id_veiculo], onDelete: Cascade)
+  veiculo    Veiculo     @relation(fields: [id_veiculo], references: [id_veiculo], onDelete: Cascade)
+  importacao Importacao? @relation(fields: [id_importacao], references: [id_importacao], onDelete: SetNull)
 
-  @@id([id_veiculo, ano_base, area_de_atuacao])
+  /// A fonte entra na chave: o mesmo ISSN pode ter estrato na CAPES, na PUC-RS e no Scopus,
+  /// e a classificação escolhe pela ordem hierárquica (RF-BE04).
+  @@id([id_veiculo, ano_base, area_de_atuacao, fonte])
+  @@index([id_importacao])
+  /// Substituição de uma carga anterior da mesma fonte, ano-base e área.
+  @@index([fonte, ano_base, area_de_atuacao])
   @@map("estrato_qualis")
 }
 
@@ -513,9 +526,10 @@ model Importacao {
   iniciado_em   DateTime?
   finalizado_em DateTime?
 
-  docente     Docente?     @relation(fields: [id_docente], references: [id_docente], onDelete: SetNull)
-  usuario     Usuario?     @relation(fields: [id_usuario], references: [id_usuario], onDelete: SetNull)
+  docente     Docente?        @relation(fields: [id_docente], references: [id_docente], onDelete: SetNull)
+  usuario     Usuario?        @relation(fields: [id_usuario], references: [id_usuario], onDelete: SetNull)
   publicacoes Publicacao[]
+  estratos    EstratoQualis[]
 
   @@index([hash_arquivo])
   @@index([status])
