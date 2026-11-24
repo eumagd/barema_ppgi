@@ -15,6 +15,7 @@ const { criarRotasImportacoes } = require("./modulos/importacoes/importacoes.rot
 const { criarRotasCorrespondencias } = require("./modulos/correspondencias/correspondencias.rotas");
 const { criarRotasPublicacoes, criarRotasAutores } = require("./modulos/publicacoes/publicacoes.rotas");
 const { criarRotasAvaliacoes, criarRotasCalculoDocente } = require("./modulos/avaliacoes/avaliacoes.rotas");
+const { criarRotasExportacoes } = require("./modulos/exportacoes/exportacoes.rotas");
 const { autenticar } = require("./middlewares/autenticacao");
 const { rotaNaoEncontrada, tratarErros } = require("./middlewares/erros");
 
@@ -48,7 +49,8 @@ function criarApp({ prisma, email }) {
   app.use("/api/correspondencias", criarRotasCorrespondencias({ prisma }));
   app.use("/api/publicacoes", autenticar, criarRotasPublicacoes({ prisma }));
   app.use("/api/autores", autenticar, criarRotasAutores({ prisma }));
-  app.use("/api/avaliacoes", autenticar, criarRotasAvaliacoes({ prisma }));
+  app.use("/api/avaliacoes", autenticar, criarRotasAvaliacoes({ prisma, email }));
+  app.use("/api/exportacoes", autenticar, criarRotasExportacoes({ prisma }));
 
   app.use(rotaNaoEncontrada);
   app.use(tratarErros);

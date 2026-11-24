@@ -4,6 +4,9 @@
  *   GET   /api/docentes/:id/calculo          ?tipo=&inicio=&fim=&referencia=  cálculo ao vivo (nada é gravado)
  *   GET   /api/avaliacoes                    ?status=&tipo=&id_docente=  resumo (view vw_resumo_avaliacao)
  *   GET   /api/avaliacoes/teto-colaboradores ranking do Art. 8º sobre o corpo docente atual
+ *   GET   /api/avaliacoes/:id/relatorio      parecer (texto e HTML), sem mudar nada
+ *   POST  /api/avaliacoes/:id/relatorio      gera o parecer (status_relatorio → GERADO)
+ *   POST  /api/avaliacoes/:id/relatorio/enviar  { para? } envia por e-mail ao docente (→ ENVIADO, data_envio)
  *   GET   /api/avaliacoes/:id                processo + cálculo com o que foi desmarcado
  *   POST  /api/avaliacoes                    { id_docente, tipo? }      abre o processo e grava o cálculo
  *   POST  /api/avaliacoes/lote               { ids_docentes: [], tipo? } abertura em lote (resultado por docente)
@@ -19,6 +22,7 @@ const { exigirPerfil, PERFIS } = require("../../middlewares/autenticacao");
 const { Erros } = require("../../lib/erros");
 const { data, paramsId, id } = require("../cadastros/comum");
 const { criarServicoCalculo } = require("./calculo.servico");
+const { montarParecer } = require("./parecer");
 
 const TIPOS = ["CREDENCIAMENTO", "RECREDENCIAMENTO"];
 
@@ -47,9 +51,25 @@ function criarRotasCalculoDocente({ prisma }) {
   return rotas;
 }
 
-function criarRotasAvaliacoes({ prisma }) {
+function criarRotasAvaliacoes({ prisma, email }) {
   const servico = criarServicoCalculo({ prisma });
   const rotas = Router();
+
+  /** Processo + cálculo respeitando as publicações desmarcadas. */
+  async function processoComCalculo(idProcesso) {
+    const avaliacao = await prisma.avaliacao.findUnique({
+      where: { id_processo: idProcesso },
+      include: { publicacoes: true, resolucao: true, docente: { select: { nome: true, email: true } } },
+    });
+    if (!avaliacao) throw Erros.naoEncontrado("Avaliação não encontrada.");
+    const consideradas = new Map(avaliacao.publicacoes.map((ap) => [ap.id_publicacao, ap.considerada]));
+    const calculo = await servico.calcular(
+      avaliacao.id_docente,
+      { tipo: avaliacao.tipo, referencia: new Date(avaliacao.data_solicitacao) },
+      { idResolucao: avaliacao.id_resolucao, consideradas },
+    );
+    return { avaliacao, calculo };
+  }
 
   async function abrir(idDocente, tipoPedido) {
     const docente = await prisma.docente.findUnique({ where: { id_docente: idDocente } });
@@ -95,20 +115,47 @@ function criarRotasAvaliacoes({ prisma }) {
   });
 
   rotas.get("/:id", validar({ params: paramsId }), async (req, res) => {
-    const avaliacao = await prisma.avaliacao.findUnique({
-      where: { id_processo: req.validado.params.id },
-      include: { publicacoes: true, resolucao: true, docente: { select: { nome: true } } },
-    });
-    if (!avaliacao) throw Erros.naoEncontrado("Avaliação não encontrada.");
-    const consideradas = new Map(avaliacao.publicacoes.map((ap) => [ap.id_publicacao, ap.considerada]));
-    const calculo = await servico.calcular(
-      avaliacao.id_docente,
-      { tipo: avaliacao.tipo, referencia: new Date(avaliacao.data_solicitacao) },
-      { idResolucao: avaliacao.id_resolucao, consideradas },
-    );
+    const { avaliacao, calculo } = await processoComCalculo(req.validado.params.id);
     const { publicacoes, ...processo } = avaliacao;
+    void publicacoes;
     res.json({ ...processo, calculo });
   });
+
+  rotas.get("/:id/relatorio", validar({ params: paramsId }), async (req, res) => {
+    const { avaliacao, calculo } = await processoComCalculo(req.validado.params.id);
+    res.json({ status_relatorio: avaliacao.status_relatorio, data_envio_relatorio: avaliacao.data_envio_relatorio, ...montarParecer(avaliacao, calculo) });
+  });
+
+  rotas.post("/:id/relatorio", validar({ params: paramsId }), async (req, res) => {
+    const { avaliacao, calculo } = await processoComCalculo(req.validado.params.id);
+    const status = avaliacao.status_relatorio === "ENVIADO" ? "ENVIADO" : "GERADO";
+    await prisma.avaliacao.update({ where: { id_processo: avaliacao.id_processo }, data: { status_relatorio: status } });
+    res.json({ status_relatorio: status, data_envio_relatorio: avaliacao.data_envio_relatorio, ...montarParecer(avaliacao, calculo) });
+  });
+
+  rotas.post(
+    "/:id/relatorio/enviar",
+    validar({ params: paramsId, body: z.object({ para: z.string().trim().email("E-mail inválido.").optional() }).default({}) }),
+    async (req, res) => {
+      const { avaliacao, calculo } = await processoComCalculo(req.validado.params.id);
+      if (avaliacao.status === "EM_ANDAMENTO") {
+        throw Erros.regraDeNegocio("Conclua a tramitação (deferir, indeferir ou cancelar) antes de enviar o parecer.");
+      }
+      const parecer = montarParecer(avaliacao, calculo);
+      const para = req.validado.body.para ?? avaliacao.docente.email;
+      try {
+        await email.enviar({ para, assunto: parecer.assunto, texto: parecer.texto, html: parecer.html });
+      } catch (erro) {
+        console.error(erro);
+        throw Erros.regraDeNegocio("Não foi possível enviar o e-mail. Confira a configuração do SMTP e tente de novo.");
+      }
+      const atualizada = await prisma.avaliacao.update({
+        where: { id_processo: avaliacao.id_processo },
+        data: { status_relatorio: "ENVIADO", data_envio_relatorio: new Date() },
+      });
+      res.json({ enviado_para: para, status_relatorio: atualizada.status_relatorio, data_envio_relatorio: atualizada.data_envio_relatorio });
+    },
+  );
 
   rotas.post("/", validar({ body: z.object({ id_docente: id, tipo: z.enum(TIPOS).optional() }) }), async (req, res) => {
     res.status(201).json(await abrir(req.validado.body.id_docente, req.validado.body.tipo));

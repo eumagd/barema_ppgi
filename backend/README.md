@@ -78,6 +78,11 @@ Rotas autenticadas exigem o cabeçalho `Authorization: Bearer <token>` devolvido
 | `PATCH /api/avaliacoes/:id/publicacoes/:idPublicacao` | autenticado | `{ considerada }`: desmarca/remarca uma publicação (RF13) |
 | `PATCH /api/avaliacoes/:id` | coordenação* | `{ status, valido_ate?, vinculo? }`; *cancelar, qualquer perfil |
 | `GET /api/avaliacoes/teto-colaboradores` | autenticado | Ranking do teto de 30% de Colaboradores (Art. 8º) |
+| `GET/POST /api/avaliacoes/:id/relatorio` | autenticado | Parecer em texto e HTML; o POST marca o relatório como gerado |
+| `POST /api/avaliacoes/:id/relatorio/enviar` | autenticado | `{ para? }`: envia o parecer por e-mail (processo já tramitado) |
+| `GET /api/importacoes/lotes/:id` | autenticado | Andamento de um `.zip` (o POST devolve 202 e processa em segundo plano) |
+| `GET /api/exportacoes/producao.xlsx` ou `.csv` | autenticado | `?inicio=&fim=&id_docente=`: produção com estrato, fonte, peso, divisor e pontos |
+| `GET /api/exportacoes/avaliacoes.xlsx` ou `.csv` | autenticado | `?status=&tipo=`: resumo dos processos |
 
 Perfis (RNF-BE07): **SECRETARIA** conduz o processo (importações, cadastros, revisão); **COORDENACAO**
 pode tudo isso e também altera os parâmetros da resolução.
@@ -229,7 +234,7 @@ backend/
 │   ├── dominio/                              regras da Resolução nº 1/2025 (motor de cálculo e parâmetros)
 │   ├── lib/                                  erros, hash de senha, e-mail
 │   ├── middlewares/                          autenticação/RBAC, validação (Zod), erros, limite de tentativas
-│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias, publicacoes, avaliacoes
+│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias, publicacoes, avaliacoes, exportacoes
 ├── test/                                     unidade (Prisma em memória) e integracao/ (PostgreSQL)
 ├── scripts/testar-integracao.js              migra o banco de teste e roda test/integracao
 ├── prisma/
@@ -250,5 +255,4 @@ backend/
 
 - Calibrar os cortes do Fuzzy Match com a planilha histórica.
 - Importação da planilha de transição (`Credenciamento2026.xlsx`), quando o layout estiver disponível.
-- Processamento em lote assíncrono, exportação XLSX/CSV, envio de pareceres por e-mail.
 - Troca do `localStorage` do front end pela API.
