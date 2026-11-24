@@ -64,7 +64,7 @@ function criarRotasQualis({ prisma }) {
   rotas.get("/pendentes", validar({ query: z.object({ area: z.string().trim().max(100).default(AREA_PADRAO) }) }), async (req, res) => {
     const { area } = req.validado.query;
     const veiculos = await prisma.veiculo.findMany({
-      where: { publicacoes: { some: {} }, estratos: { none: { area_de_atuacao: area } } },
+      where: { publicacoes: { some: { id_mesclada_em: null } }, estratos: { none: { area_de_atuacao: area } } },
       orderBy: { nome: "asc" },
       include: {
         _count: { select: { publicacoes: true } },

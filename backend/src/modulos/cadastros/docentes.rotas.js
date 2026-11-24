@@ -210,6 +210,7 @@ function criarRotasDocentes({ prisma }) {
       const publicacoes = await prisma.publicacao.findMany({
         where: {
           autorias: { some: { id_autor: autor.id_autor } },
+          id_mesclada_em: null,
           ano_publicacao: { ...(inicio ? { gte: inicio } : {}), ...(fim ? { lte: fim } : {}) },
         },
         orderBy: [{ ano_publicacao: "desc" }, { titulo: "asc" }],

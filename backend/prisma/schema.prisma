@@ -341,9 +341,14 @@ model Publicacao {
   id_veiculo         Int?
   /// Carga que trouxe a publicação (rastreabilidade, RF-BE16).
   id_importacao      Int?
+  /// Correspondência confirmada: esta publicação é a mesma que `id_mesclada_em` e suas
+  /// autorias foram movidas para lá. Publicações mescladas não entram na produção.
+  id_mesclada_em     Int?
 
   veiculo                    Veiculo?              @relation(fields: [id_veiculo], references: [id_veiculo], onDelete: SetNull)
   importacao                 Importacao?           @relation(fields: [id_importacao], references: [id_importacao], onDelete: SetNull)
+  mesclada_em                Publicacao?           @relation("Mescla", fields: [id_mesclada_em], references: [id_publicacao], onDelete: SetNull)
+  publicacoes_mescladas      Publicacao[]          @relation("Mescla")
   autorias                   Autoria[]
   avaliacoes                 AvaliacaoPublicacao[]
   correspondencias_origem    Correspondencia[]     @relation("CorrespondenciaOrigem")
@@ -353,6 +358,7 @@ model Publicacao {
   @@index([ano_publicacao])
   @@index([doi])
   @@index([id_importacao])
+  @@index([id_mesclada_em])
   @@index([titulo_normalizado(ops: raw("gin_trgm_ops"))], type: Gin, map: "publicacao_titulo_normalizado_trgm_idx")
   @@map("publicacao")
 }
@@ -562,6 +568,8 @@ model Correspondencia {
   motivo                  MotivoCorrespondencia
   decisao                 DecisaoCorrespondencia @default(PENDENTE)
   justificativa           String?                @db.Text
+  /// Autorias movidas na mescla: [{ id_autor, ordem_autoria }] (para desfazer se a decisão mudar).
+  autores_movidos         Json?
   id_usuario              Int?
   decidido_em             DateTime?
   criado_em               DateTime               @default(now())

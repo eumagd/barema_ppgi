@@ -20,6 +20,7 @@ const { normalizarTexto } = require("../../lib/texto");
 const { PESOS_ESTRATO } = require("../../dominio/parametros-resolucao-1-2025");
 const { AREA_PADRAO } = require("../qualis/qualis.servico");
 const { lerCsvQLattes } = require("./qlattes.leitor");
+const { criarServicoFuzzy, publicacaoVigente } = require("../correspondencias/fuzzy.servico");
 
 const LIMITES_ZIP = { arquivos: 200, bytesDescompactados: 50 * 1024 * 1024 };
 const MAX_ERROS_GUARDADOS = 200;
@@ -54,6 +55,8 @@ function extrairZip(buffer) {
 }
 
 function criarServicoImportacao({ prisma }) {
+  const fuzzy = criarServicoFuzzy({ prisma });
+
   async function obterPesos() {
     const p = await prisma.parametro.findFirst({ where: { chave: "pesos_estrato" }, orderBy: { resolucao: { data_vigencia: "desc" } } });
     return p ? p.valor : PESOS_ESTRATO;
@@ -146,6 +149,14 @@ function criarServicoImportacao({ prisma }) {
         where: { titulo_normalizado: tituloNormalizado, ano_publicacao: a.ano, id_veiculo: idVeiculo },
         include: { autorias: { select: { id_autor: true, ordem_autoria: true } } },
       });
+      // Já mesclada por uma correspondência confirmada: vale a publicação de destino.
+      if (publicacao?.id_mesclada_em) {
+        const vigente = await publicacaoVigente(tx, publicacao.id_publicacao);
+        publicacao = await tx.publicacao.findUnique({
+          where: { id_publicacao: vigente.id_publicacao },
+          include: { autorias: { select: { id_autor: true, ordem_autoria: true } } },
+        });
+      }
       if (!publicacao) {
         publicacao = await tx.publicacao.create({
           data: { titulo: a.titulo, titulo_normalizado: tituloNormalizado, ano_publicacao: a.ano, id_veiculo: idVeiculo, id_importacao: idImportacao },
@@ -169,6 +180,7 @@ function criarServicoImportacao({ prisma }) {
     c.sem_estrato = await tx.publicacao.count({
       where: {
         autorias: { some: { id_autor: autor.id_autor } },
+        id_mesclada_em: null,
         OR: [{ id_veiculo: null }, { veiculo: { estratos: { none: {} } } }],
       },
     });
@@ -224,11 +236,18 @@ function criarServicoImportacao({ prisma }) {
         { timeout: 120_000 },
       );
 
+      // Fuzzy Match da produção do docente contra o resto da base (RF-BE07 a RF-BE10).
+      const daProducao = await prisma.publicacao.findMany({
+        where: { id_mesclada_em: null, autorias: { some: { autor: { id_docente: docente.id_docente } } } },
+        select: { id_publicacao: true },
+      });
+      const { cortes, ...correspondencias } = await fuzzy.processar(daProducao.map((p) => p.id_publicacao));
+
       const concluida = await prisma.importacao.update({
         where: { id_importacao: importacao.id_importacao },
         data: {
           status: "CONCLUIDO",
-          contagens: { ...contagens, linhas_com_erro: erros.length, pesquisador: pesquisador.nome },
+          contagens: { ...contagens, linhas_com_erro: erros.length, pesquisador: pesquisador.nome, correspondencias },
           erros: erros.length ? { total: erros.length, linhas: erros.slice(0, MAX_ERROS_GUARDADOS) } : undefined,
           finalizado_em: new Date(),
         },

@@ -63,6 +63,9 @@ Rotas autenticadas exigem o cabeçalho `Authorization: Bearer <token>` devolvido
 | `GET /api/docentes/:id/publicacoes` | autenticado | `?inicio=&fim=` (anos): produção com estrato vigente, fonte e coautores |
 | `GET /api/qualis/pendentes` | autenticado | Fila manual: periódicos com publicações e sem estrato em nenhuma base |
 | `POST /api/qualis/classificacoes` | autenticado | `{ id_veiculo, estrato, justificativa }` → estrato com fonte `MANUAL` |
+| `GET /api/correspondencias` | autenticado | `?faixa=revisao\|automatica\|decididas\|todas&id_docente=`: pares do Fuzzy Match |
+| `PATCH /api/correspondencias/:id` | autenticado | `{ decisao: CONFIRMADA\|REJEITADA, justificativa? }`: confirmar mescla; rejeitar desfaz |
+| `POST /api/correspondencias/processar` | autenticado | Roda o Fuzzy Match na base toda (ex.: depois de mudar os cortes) |
 
 Perfis (RNF-BE07): **SECRETARIA** conduz o processo (importações, cadastros, revisão); **COORDENACAO**
 pode tudo isso e também altera os parâmetros da resolução.
@@ -94,6 +97,27 @@ nome,lattes_url,ano_publicacao,titulo_publicacao,periodico,issn,qualis,pontos,ar
 lista de coautores nem DOI**. Por isso (a) a produção em eventos (58% do PPGI) precisa de outra
 entrada, a planilha de transição ou um cadastro de anais; e (b) a coautoria com **discentes**,
 exigida no recredenciamento, não vem do arquivo e terá de ser marcada na revisão ou vir de outra fonte.
+
+### Fuzzy Match
+
+Roda no PostgreSQL (`pg_trgm` + `unaccent`) ao fim de cada importação, comparando a produção do
+docente com o resto da base. Cada par recebe uma nota de 0 a 100:
+
+1. **DOI idêntico** → 100;
+2. **mesmo veículo e título igual** (inteiro ou sem o subtítulo após `:`) → 100;
+3. **similaridade de trigramas do título**, só entre veículos do mesmo tipo e com **ano ±1**.
+
+Com os cortes da tabela `parametro` (padrão **92** e **80**): ≥ 92 mescla automaticamente; de 80 a 91
+vai para a fila de revisão; abaixo de 80, descarta. Publicações que já têm um autor em comum não são
+comparadas (no mesmo CV, títulos parecidos costumam ser obras diferentes).
+
+**Mesclar** move as autorias da publicação mais nova para a mais antiga e marca a nova com
+`id_mesclada_em` (ela some da produção). O que foi movido fica guardado na correspondência, então
+**rejeitar uma mescla, mesmo automática, a desfaz**. Reprocessar respeita as decisões já tomadas.
+
+Os cortes ainda **não foram calibrados** com a planilha histórica (`Credenciamento2026.xlsx`): ajuste-os
+com `PUT /api/resolucoes/:id/parametros/fuzzy.corte_confirmacao` (e `fuzzy.corte_revisao`) e rode
+`POST /api/correspondencias/processar`.
 
 ### Bases Qualis
 
@@ -167,7 +191,7 @@ backend/
 │   ├── dominio/                              regras da Resolução nº 1/2025 (parâmetros iniciais)
 │   ├── lib/                                  erros, hash de senha, e-mail
 │   ├── middlewares/                          autenticação/RBAC, validação (Zod), erros, limite de tentativas
-│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes
+│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias
 ├── test/                                     unidade (Prisma em memória) e integracao/ (PostgreSQL)
 ├── scripts/testar-integracao.js              migra o banco de teste e roda test/integracao
 ├── prisma/
@@ -186,6 +210,6 @@ backend/
 
 ## Próximos passos
 
-- Fuzzy Match no PostgreSQL (DOI → ISSN+título → `pg_trgm` com ano ±1) e fila de revisão.
+- Calibrar os cortes do Fuzzy Match com a planilha histórica.
 - Entrada da produção em eventos e da coautoria com discentes (o CSV do QLattes não traz).
 - Motor de cálculo da Resolução nº 1/2025 e troca do `localStorage` do front end pela API.
