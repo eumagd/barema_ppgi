@@ -65,6 +65,52 @@
     return UI.panel({ title: "Participação no processo", body });
   }
 
+  /* ---------- Importação do CSV do QLattes ---------- */
+  let arquivoCsv = null;
+  document.addEventListener("change", (e) => {
+    if (e.target && e.target.id === "csv-qlattes") arquivoCsv = e.target.files[0] || null;
+  });
+
+  function importPanel(t) {
+    return UI.panel({
+      title: "Importar CSV do QLattes",
+      body: `<p class="text-[14px] text-ink/80">No Currículo Lattes do docente, abra a visualização do QLattes e clique em <strong>Exportar dados</strong>. Envie aqui o arquivo gerado.</p>
+        <label for="csv-qlattes" class="mt-3 block text-[14px] font-semibold text-ppgi">Arquivo .csv</label>
+        <input id="csv-qlattes" type="file" accept=".csv" class="mt-1 block w-full border border-ppgi-soft p-2 text-[14px]">
+        <div class="mt-3">${UI.button("⤒ Importar produção", { variant: "outline", action: "import-csv" })}</div>
+        <p class="mt-2 text-[12px] text-muted">${t.id_lattes ? `ID Lattes: <span class="font-mono">${esc(t.id_lattes)}</span>. ` : "O ID Lattes é gravado na primeira importação. "}Reimportar um CSV atualizado só acrescenta publicações.</p>`,
+    });
+  }
+
+  async function importCsv(confirmName = false) {
+    const arquivo = arquivoCsv;
+    if (!arquivo) return Feedback.toast("Escolha o arquivo .csv exportado pelo QLattes.", "error");
+    try {
+      const r = await UseCases.importCsv(teacherId, arquivo, { confirmName });
+      const c = r.importacao.contagens || {};
+      const fuzzy = c.correspondencias || {};
+      Feedback.toast(
+        r.reaproveitada
+          ? "Este arquivo já tinha sido importado."
+          : `${c.novas || 0} publicação(ões) nova(s), ${c.ja_importadas || 0} já existente(s), ${fuzzy.para_revisao || 0} para revisar.`,
+      );
+      arquivoCsv = null;
+      view.refresh();
+    } catch (erro) {
+      if (/confirmar_nome/.test(erro.message)) {
+        return Feedback.openModal({
+          title: "O nome do CSV não bate com o docente",
+          body: esc(erro.message.replace(/ Se estiver certo.*$/, "")) + "<br><br>Importar mesmo assim?",
+          actions: [
+            { text: "Cancelar", variant: "outline" },
+            { text: "Importar mesmo assim", onClick: () => importCsv(true) },
+          ],
+        });
+      }
+      Feedback.toast(erro.message, "error");
+    }
+  }
+
   function glossary() {
     return UI.help("O que significa cada campo", `<ul class="space-y-1.5">
       <li><strong class="text-ppgi">Vínculo institucional</strong>: relação do docente com o IC/UFAL (efetivo ou substituto).</li>
@@ -82,7 +128,7 @@
         ${cycleSummary(t)}
         <div class="grid gap-5 lg:grid-cols-2">
           ${teacherData(t)}
-          <div class="space-y-5">${participation(t)}${glossary()}</div>
+          <div class="space-y-5">${importPanel(t)}${participation(t)}${glossary()}</div>
         </div>
       </div>`;
   }
@@ -109,6 +155,7 @@
       render,
       actions: {
         "confirm-flag": confirmFlag,
+        "import-csv": () => importCsv(false),
         unflag: () => { UseCases.unflagNotParticipating(teacherId); Feedback.toast("Sinalização desfeita."); view.refresh(); },
       },
     },

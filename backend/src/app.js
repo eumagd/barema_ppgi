@@ -2,6 +2,8 @@
  * Montagem da aplicação Express. As dependências (Prisma, e-mail) são
  * injetadas para facilitar os testes.
  */
+const path = require("node:path");
+const fs = require("node:fs");
 const express = require("express");
 const cors = require("cors");
 const config = require("./config");
@@ -51,6 +53,10 @@ function criarApp({ prisma, email }) {
   app.use("/api/autores", autenticar, criarRotasAutores({ prisma }));
   app.use("/api/avaliacoes", autenticar, criarRotasAvaliacoes({ prisma, email }));
   app.use("/api/exportacoes", autenticar, criarRotasExportacoes({ prisma }));
+
+  // Front end estático (../frontend): http://localhost:3000/ abre a plataforma.
+  const pastaFrontend = path.resolve(__dirname, "../../frontend");
+  if (fs.existsSync(pastaFrontend)) app.use(express.static(pastaFrontend, { extensions: ["html"] }));
 
   app.use(rotaNaoEncontrada);
   app.use(tratarErros);

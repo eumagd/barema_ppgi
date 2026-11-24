@@ -45,7 +45,7 @@
       <nav class="flex-1 overflow-y-auto py-3">${NAV_ITEMS.map((i) => navLink(i, activeKey)).join("")}</nav>
       <div class="space-y-2 border-t border-ppgi-soft px-4 py-3">
         <p class="text-[12px] leading-snug text-muted">Ciclo ${Catalog.CYCLE.year} · prazo ${Catalog.CYCLE.deadline}<br>${esc(Catalog.CYCLE.resolution)}</p>
-        <button type="button" data-shell="reset" class="text-[12px] text-muted underline underline-offset-2 hover:text-ppgi">Restaurar dados de demonstração</button>
+        <button type="button" data-shell="reset" class="text-[12px] text-muted underline underline-offset-2 hover:text-ppgi">⟳ Recarregar dados do servidor</button>
       </div>
     </aside>
     <div id="sidebar-backdrop" data-shell="close-menu" class="fixed inset-0 z-30 hidden bg-black/50 lg:hidden"></div>`;
@@ -105,14 +105,7 @@
   }
 
   function confirmReset() {
-    Feedback.openModal({
-      title: "Restaurar dados de demonstração?",
-      body: "As ações feitas nesta demonstração (desvínculos, envios, sinalizações, coautorias revisadas, processos iniciados) serão desfeitas. Você continua conectado.",
-      actions: [
-        { text: "Cancelar", variant: "outline" },
-        { text: "Restaurar", onClick: () => { UseCases.resetSampleData(); window.location.reload(); } },
-      ],
-    });
+    UseCases.resetSampleData().then(() => Feedback.toast("Dados atualizados."), (e) => Feedback.toast(e.message, "error"));
   }
 
   function logout() {
@@ -167,13 +160,15 @@
     });
 
     renderChrome();
-    return {
+    const atual = {
       refresh() {
         renderChrome();
         view.update();
       },
     };
+    PPGI.Shell.atual = atual;
+    return atual;
   }
 
-  PPGI.Shell = { start };
+  PPGI.Shell = { start, atual: null };
 })((window.PPGI = window.PPGI || {}));

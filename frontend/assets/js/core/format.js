@@ -11,7 +11,7 @@
   }
 
   function formatNumber(n) {
-    return Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+    return Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
   }
 
   function formatSigned(n) {

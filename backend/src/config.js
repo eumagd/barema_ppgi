@@ -19,7 +19,7 @@ const config = {
     segredo: obrigatorio("JWT_SECRET", "segredo-de-desenvolvimento"),
     expiraEm: process.env.JWT_EXPIRES_IN || "8h",
   },
-  frontendUrl: (process.env.FRONTEND_URL || "http://localhost:5500").replace(/\/+$/, ""),
+  frontendUrl: (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, ""),
   redefinicaoSenha: { validadeMinutos: 60 },
   smtp: {
     host: process.env.SMTP_HOST || "",

@@ -26,12 +26,12 @@ function hashSenha(senha) {
 }
 
 const DOCENTES = [
-  { chave: "ana", matricula: "IC0001", nome: "Ana C. Souza", email: "ana.souza@ic.ufal.br", vinculo: "PERMANENTE", citacao: "SOUZA, A. C." },
-  { chave: "bruno", matricula: "IC0002", nome: "Bruno M. Lima", email: "bruno.lima@ic.ufal.br", vinculo: "PERMANENTE", citacao: "LIMA, B. M." },
-  { chave: "carla", matricula: "IC0003", nome: "Carla R. Pereira", email: "carla.pereira@ic.ufal.br", vinculo: null, citacao: "PEREIRA, C. R." },
-  { chave: "fernanda", matricula: "IC0005", nome: "Fernanda P. Rocha", email: "fernanda.rocha@ic.ufal.br", vinculo: "PERMANENTE", citacao: "ROCHA, F. P." },
-  { chave: "gustavo", matricula: "IC0006", nome: "Gustavo T. Nogueira", email: "gustavo.nogueira@ic.ufal.br", vinculo: "COLABORADOR", citacao: "NOGUEIRA, G. T." },
-  { chave: "helena", matricula: "IC0007", nome: "Helena S. Barros", email: "helena.barros@ic.ufal.br", vinculo: "COLABORADOR", citacao: "BARROS, H. S." },
+  { chave: "ana", departamento: "Ciência da Computação", matricula: "IC0001", nome: "Ana C. Souza", email: "ana.souza@ic.ufal.br", vinculo: "PERMANENTE", citacao: "SOUZA, A. C." },
+  { chave: "bruno", departamento: "Sistemas de Software", matricula: "IC0002", nome: "Bruno M. Lima", email: "bruno.lima@ic.ufal.br", vinculo: "PERMANENTE", citacao: "LIMA, B. M." },
+  { chave: "carla", departamento: "Ciência da Computação", matricula: "IC0003", nome: "Carla R. Pereira", email: "carla.pereira@ic.ufal.br", vinculo: null, citacao: "PEREIRA, C. R." },
+  { chave: "fernanda", departamento: "Sistemas de Software", matricula: "IC0005", nome: "Fernanda P. Rocha", email: "fernanda.rocha@ic.ufal.br", vinculo: "PERMANENTE", citacao: "ROCHA, F. P." },
+  { chave: "gustavo", departamento: "Computação Aplicada", matricula: "IC0006", nome: "Gustavo T. Nogueira", email: "gustavo.nogueira@ic.ufal.br", vinculo: "COLABORADOR", citacao: "NOGUEIRA, G. T." },
+  { chave: "helena", departamento: "Ciência da Computação", matricula: "IC0007", nome: "Helena S. Barros", email: "helena.barros@ic.ufal.br", vinculo: "COLABORADOR", citacao: "BARROS, H. S." },
 ];
 
 /* issn_sigla fictício para periódicos (DEMO-xxxx); sigla real para conferências. */
@@ -118,6 +118,8 @@ async function main() {
         nome: d.nome,
         email: d.email,
         vinculo: d.vinculo,
+        departamento: d.departamento,
+        data_vinculo: d.vinculo ? new Date("2018-03-01") : null,
         data_ultima_atualizacao: new Date("2026-09-11"),
         autor: {
           create: {

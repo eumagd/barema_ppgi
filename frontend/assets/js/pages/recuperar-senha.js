@@ -20,20 +20,18 @@
   }
 
   function sentMessage() {
-    const link = pageUrl("redefinir-senha", { email: state.sentTo, token: "demo" });
     return `<div class="flex h-14 w-14 items-center justify-center border border-ppgi bg-ppgi-tint text-2xl text-ppgi" aria-hidden="true">✉</div>
       <h1 class="mt-5 text-2xl font-extrabold text-ppgi">Verifique seu e-mail</h1>
       <p class="mt-2 text-[15px] leading-relaxed text-ink/80">Se <strong>${esc(state.sentTo)}</strong> estiver cadastrado, você receberá um link para redefinir a senha em alguns minutos. O link vale por 1 hora.</p>
       <div class="mt-6 space-y-3">
-        ${UI.button("Abrir o link recebido (demonstração)", { href: link, wide: true, size: "lg" })}
         ${UI.button("Não recebi, enviar de novo", { variant: "outline", wide: true, action: "resend" })}
       </div>
       <p class="mt-6 text-[14px] text-muted"><a href="login.html" class="font-semibold text-ppgi hover:underline">Voltar para o login</a></p>`;
   }
 
-  function submit(form) {
+  async function submit(form) {
     state.email = form.elements.email.value;
-    const result = Auth.requestPasswordReset(state.email);
+    const result = await Auth.requestPasswordReset(state.email);
     state.error = result.ok ? "" : result.error;
     state.sentTo = result.ok ? result.email : null;
     view.update();

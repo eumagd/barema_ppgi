@@ -76,6 +76,7 @@ function calcularPesquisa({ publicacoes, idDocente, tipo, p }) {
       divisor,
       pontos: considerada ? arredondar(peso / divisor) : 0,
       coautores_ppgi: divisor - 1,
+      coautores: pub.autores.filter((a) => !a.avaliado).map((a) => ({ tipo: a.tipo, nome: a.nome, id_docente: a.id_docente ?? null, ppgi: Boolean(a.ppgi) })),
       com_discente: pub.autores.some((a) => a.tipo === "DISCENTE"),
     };
   });

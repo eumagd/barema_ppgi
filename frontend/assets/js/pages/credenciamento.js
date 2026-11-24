@@ -232,12 +232,16 @@
   }
 
   /* ---------- Ações ---------- */
-  function start() {
+  async function start() {
     const ids = selectedIds();
-    UseCases.startProcess(ids, processType());
-    state.started = isBatch()
-      ? `${processType()} iniciado para ${Format.plural(ids.length, "docente", "docentes")}`
-      : `${processType()} iniciado para ${currentTeacher().name}`;
+    const tipo = processType();
+    const resultados = await UseCases.startProcess(ids, tipo);
+    const abertos = resultados.filter((r) => r.status === "ABERTO").length;
+    state.started = abertos
+      ? isBatch()
+        ? `${tipo} iniciado para ${Format.plural(abertos, "docente", "docentes")}`
+        : `${tipo} iniciado para ${currentTeacher().name}`
+      : null;
     view.refresh();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }

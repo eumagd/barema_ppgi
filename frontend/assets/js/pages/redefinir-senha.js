@@ -8,7 +8,8 @@
   const { escapeHtml: esc } = Format;
 
   const email = Format.queryParam("email") || "";
-  const hasValidLink = Format.queryParam("token") === "demo" && Auth.isValidEmail(email);
+  const token = Format.queryParam("token") || "";
+  const hasValidLink = token.length >= 20;
   const state = { password: "", confirmation: "", error: "", done: false };
 
   function rulesList() {
@@ -55,10 +56,10 @@
     document.getElementById("regras-senha").outerHTML = rulesList();
   }
 
-  function submit(formEl) {
+  async function submit(formEl) {
     state.password = formEl.elements.senha.value;
     state.confirmation = formEl.elements.confirmacao.value;
-    const result = Auth.resetPassword(email, state.password, state.confirmation);
+    const result = await Auth.resetPassword(token, state.password, state.confirmation);
     state.error = result.ok ? "" : result.error;
     state.done = result.ok;
     view.update();

@@ -20,7 +20,7 @@ npm run db:up                 # sobe o PostgreSQL pelo Docker (opcional)
 npx prisma migrate dev        # aplica as migrações (init + ajustes manuais)
 npx prisma db seed            # dados de demonstração (mesmos do front end)
 npx prisma studio             # abre o navegador de dados
-npm run dev                   # sobe a API em http://localhost:3000
+npm run dev                   # sobe a API e o front end em http://localhost:3000
 npm test                      # testes de unidade (não precisam de banco)
 npm run test:integracao       # testes contra o PostgreSQL, no banco DATABASE_URL_TESTE (é apagado!)
 ```
@@ -255,4 +255,4 @@ backend/
 
 - Calibrar os cortes do Fuzzy Match com a planilha histórica.
 - Importação da planilha de transição (`Credenciamento2026.xlsx`), quando o layout estiver disponível.
-- Troca do `localStorage` do front end pela API.
+- Tela para a fila manual de Qualis "N" e para a fila de revisão completa do Fuzzy Match (as rotas já existem).

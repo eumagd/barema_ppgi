@@ -1,6 +1,7 @@
 /*
  * Docentes (professores.html, perfil.html):
  *   GET    /api/docentes                 ?busca=&vinculo=PERMANENTE|COLABORADOR|NENHUM&participando=true|false
+ *   GET    /api/docentes/resumo          cadastro + último processo + orientandos + turmas (para as telas)
  *   GET    /api/docentes/:id             com autor, nomes de citação, orientandos, coorientações e turmas
  *   POST   /api/docentes                 cria o docente e seu registro em AUTOR
  *   PATCH  /api/docentes/:id
@@ -92,6 +93,30 @@ function criarRotasDocentes({ prisma }) {
       include: { _count: { select: { orientandos: true, coorientacoes: true, avaliacoes: true } } },
     });
     res.json(docentes);
+  });
+
+  /**
+   * Tudo o que as telas mostram de cada docente numa chamada só: cadastro, último
+   * processo (com o relatório), orientandos em andamento e turmas por ano e nível.
+   */
+  rotas.get("/resumo", async (_req, res) => {
+    const docentes = await prisma.docente.findMany({
+      orderBy: { nome: "asc" },
+      include: {
+        avaliacoes: { orderBy: [{ data_solicitacao: "desc" }, { id_processo: "desc" }], take: 1 },
+        orientandos: { select: { data_conclusao: true } },
+        turmas: { select: { ano: true, semestre: true, disciplina: { select: { nivel: true, estudo_dirigido: true } } } },
+      },
+    });
+    res.json(
+      docentes.map(({ avaliacoes, orientandos, turmas, ...d }) => ({
+        ...d,
+        ultima_avaliacao: avaliacoes[0] ?? null,
+        orientandos_em_andamento: orientandos.filter((o) => !o.data_conclusao).length,
+        anos_conclusao_orientacoes: orientandos.filter((o) => o.data_conclusao).map((o) => new Date(o.data_conclusao).getUTCFullYear()),
+        turmas: turmas.map((t) => ({ ano: t.ano, semestre: t.semestre, nivel: t.disciplina.nivel, estudo_dirigido: t.disciplina.estudo_dirigido })),
+      })),
+    );
   });
 
   rotas.get("/:id", validar({ params: paramsId }), async (req, res) => {

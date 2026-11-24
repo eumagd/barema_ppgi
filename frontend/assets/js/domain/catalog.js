@@ -5,7 +5,8 @@
 (function (PPGI) {
   "use strict";
 
-  const QUALIS_POINTS = { A1: 100, A2: 85, A3: 70, A4: 55, B1: 40, B2: 25, B3: 12.5, B4: 5 };
+  /* Pesos da Resolução nº 1/2025 (o cálculo oficial é feito no back end, pela tabela de parâmetros). */
+  const QUALIS_POINTS = { A1: 1, A2: 0.875, A3: 0.75, A4: 0.625, B1: 0.5, B2: 0, B3: 0, B4: 0, C: 0 };
   const STRATA = Object.keys(QUALIS_POINTS);
   const UPPER_STRATA = ["A1", "A2", "A3", "A4"];
   const TOP_STRATA = ["A1", "A2"];
@@ -17,10 +18,13 @@
     minCoauthorConfidence: 80,
   };
 
-  const PERIODS = [
-    { id: "2023-2025", label: "2023 – 2025", years: [2023, 2024, 2025] },
-    { id: "2022-2024", label: "2022 – 2024", years: [2022, 2023, 2024] },
-  ];
+  /* Janela de Pesquisa de 36 meses: os 3 anos completos anteriores (e as duas anteriores a ela). */
+  const ANO_FIM = new Date().getFullYear() - 1;
+  const PERIODS = [0, 1, 2].map((recuo) => {
+    const fim = ANO_FIM - recuo;
+    const years = [fim - 2, fim - 1, fim];
+    return { id: `${years[0]}-${fim}`, label: `${years[0]} – ${fim}`, years };
+  });
 
   const APP = {
     name: "Plataforma de Gerenciamento de Baremas",
@@ -35,7 +39,7 @@
     advisor: "Prof. Dr. Ranilson Paiva",
   };
 
-  /* Usuários de demonstração (autenticação simulada no navegador, sem segurança real). */
+  /* Usuários criados pelo seed do banco (npx prisma db seed), para a tela de login sugerir. */
   const DEMO_USERS = [
     { email: "secretaria@ic.ufal.br", name: "Secretaria do PPGI", role: "Secretaria", password: "ppgi2026" },
     { email: "coordenacao@ic.ufal.br", name: "Coordenação do PPGI", role: "Coordenação", password: "ppgi2026" },
