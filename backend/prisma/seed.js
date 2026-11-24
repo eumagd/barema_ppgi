@@ -197,7 +197,7 @@ async function main() {
   const itens = consideradas.map((p) => {
     const estrato = VEICULOS.find((v) => v.chave === p.veiculo).estrato;
     const coautoresPpgi = p.autores.filter(doPpgi).length;
-    const pontos = Math.round((QUALIS_POINTS[estrato] / coautoresPpgi) * 100) / 100;
+    const pontos = Math.round((QUALIS_POINTS[estrato] / coautoresPpgi) * 10000) / 10000;
     return { id_publicacao: p.id_publicacao, considerada: true, pontos_atribuidos: pontos };
   });
   const total = itens.reduce((s, i) => s + i.pontos_atribuidos, 0);
@@ -207,7 +207,7 @@ async function main() {
       tipo: "RECREDENCIAMENTO",
       data_solicitacao: new Date("2026-09-15"),
       status: "EM_ANDAMENTO",
-      pontuacao_pesquisa: Math.round(total * 100) / 100,
+      pontuacao_pesquisa: Math.round(total * 10000) / 10000,
       id_docente: docentes.bruno.id_docente,
       id_resolucao: resolucao.id_resolucao,
       publicacoes: { create: itens },

@@ -9,6 +9,7 @@ const { PrismaClient } = require("@prisma/client");
 const request = require("supertest");
 const { criarApp } = require("../../src/app");
 const { hashSenha } = require("../../src/lib/senha");
+const { PARAMETROS } = require("../../src/dominio/parametros-resolucao-1-2025");
 
 require("dotenv").config({ quiet: true });
 const URL_TESTE = process.env.DATABASE_URL_TESTE;
@@ -47,8 +48,15 @@ async function clienteAutenticado(perfil = "SECRETARIA") {
   return { app, get: comToken("get"), post: comToken("post"), patch: comToken("patch"), put: comToken("put"), delete: comToken("delete") };
 }
 
+/** Resolução nº 1/2025 com os parâmetros iniciais (os testes de cálculo precisam dela). */
+async function criarResolucao() {
+  const resolucao = await obterPrisma().resolucao.create({ data: { numero_ano: "1/2025", data_vigencia: new Date("2025-01-01") } });
+  await obterPrisma().parametro.createMany({ data: PARAMETROS.map((p) => ({ ...p, id_resolucao: resolucao.id_resolucao })) });
+  return resolucao;
+}
+
 async function encerrar() {
   if (prisma) await prisma.$disconnect();
 }
 
-module.exports = { pular, obterPrisma, limparBanco, clienteAutenticado, encerrar };
+module.exports = { pular, obterPrisma, limparBanco, clienteAutenticado, criarResolucao, encerrar };

@@ -70,6 +70,14 @@ Rotas autenticadas exigem o cabeçalho `Authorization: Bearer <token>` devolvido
 | `POST /api/publicacoes` | autenticado | Cadastro manual (eventos, coautores): `{ titulo, ano, doi?, veiculo, autores: [id_autor] }` |
 | `GET/PATCH/DELETE /api/publicacoes/:id` | autenticado | Detalhe, edição e exclusão (recusada se já entrou numa avaliação) |
 | `POST/DELETE /api/publicacoes/:id/autores` | autenticado | Acrescenta ou retira coautores (ex.: o discente do recredenciamento) |
+| `GET /api/docentes/:id/calculo` | autenticado | `?tipo=&inicio=&fim=&referencia=`: cálculo ao vivo com todos os critérios (nada é gravado) |
+| `GET /api/avaliacoes` | autenticado | `?status=&tipo=&id_docente=`: resumo dos processos (`vw_resumo_avaliacao`) |
+| `GET /api/avaliacoes/:id` | autenticado | Processo + cálculo, respeitando as publicações desmarcadas |
+| `POST /api/avaliacoes`, `POST /api/avaliacoes/lote` | autenticado | Abre o processo (individual ou em lote) e grava o cálculo |
+| `POST /api/avaliacoes/:id/recalcular` | autenticado | Refaz o cálculo de um processo em andamento |
+| `PATCH /api/avaliacoes/:id/publicacoes/:idPublicacao` | autenticado | `{ considerada }`: desmarca/remarca uma publicação (RF13) |
+| `PATCH /api/avaliacoes/:id` | coordenação* | `{ status, valido_ate?, vinculo? }`; *cancelar, qualquer perfil |
+| `GET /api/avaliacoes/teto-colaboradores` | autenticado | Ranking do teto de 30% de Colaboradores (Art. 8º) |
 
 Perfis (RNF-BE07): **SECRETARIA** conduz o processo (importações, cadastros, revisão); **COORDENACAO**
 pode tudo isso e também altera os parâmetros da resolução.
@@ -127,6 +135,27 @@ comparadas (no mesmo CV, títulos parecidos costumam ser obras diferentes).
 Os cortes ainda **não foram calibrados** com a planilha histórica (`Credenciamento2026.xlsx`): ajuste-os
 com `PUT /api/resolucoes/:id/parametros/fuzzy.corte_confirmacao` (e `fuzzy.corte_revisao`) e rode
 `POST /api/correspondencias/processar`.
+
+### Motor de cálculo (Resolução nº 1/2025)
+
+As regras ficam em `src/dominio/motor-barema.js`, como funções puras (testadas uma a uma em
+`test/motor-barema.test.js`); os números vêm da tabela `parametro`.
+
+| Critério | Regra |
+| --- | --- |
+| Pontos do artigo | peso do estrato (A1 1,0 · A2 0,875 · A3 0,75 · A4 0,625 · B1 0,5 · abaixo 0) ÷ nº de docentes **do PPGI** entre os autores (o avaliado sempre conta; discentes e externos não) |
+| Período de Pesquisa | 36 meses; por padrão os 3 anos completos anteriores à data de referência (`?inicio=&fim=` muda) |
+| Credenciamento | ≥ 3,5 pontos e ≥ 2 **periódicos** A3 ou superior; bloqueado se toda a produção também for de um mesmo docente do PPGI (Art. 3º, §2º) |
+| Recredenciamento | ≥ 2,5 pontos, ≥ 1 periódico A4 ou superior e ≥ 1 produção com discente do PPGI |
+| Orientação (recred.) | ≥ 2 em andamento ou concluídas nos últimos 24 meses; coorientação vale 0,5; teto de 8 em andamento |
+| Docência (recred.) | ≥ 1 disciplina nos últimos 24 meses, sem "Estudo Dirigido" (níveis em `docencia.niveis`, padrão só pós-graduação) |
+| Recém-credenciado | vínculo há menos de 24 meses: isento de Orientação e Docência |
+| Colaborador → Permanente | 12 meses de vínculo + 1 publicação com discente + 1 disciplina (informado em `progressao`) |
+| Teto de Colaboradores | colaboradores aptos ordenados pela Pesquisa; entram até ⌊30% × (permanentes aptos + colaboradores aptos)⌋ |
+
+Ao abrir um processo, o cálculo é gravado (`avaliacao` e `avaliacao_publicacao`); desmarcar uma
+publicação recalcula. Deferir um credenciamento exige o vínculo (Permanente/Colaborador), que passa a
+valer no cadastro do docente. Os pontos são guardados com 4 casas decimais.
 
 ### Bases Qualis
 
@@ -197,10 +226,10 @@ backend/
 ├── src/
 │   ├── app.js / server.js                    montagem do Express e ponto de entrada
 │   ├── config.js / db.js                     variáveis de ambiente e Prisma Client
-│   ├── dominio/                              regras da Resolução nº 1/2025 (parâmetros iniciais)
+│   ├── dominio/                              regras da Resolução nº 1/2025 (motor de cálculo e parâmetros)
 │   ├── lib/                                  erros, hash de senha, e-mail
 │   ├── middlewares/                          autenticação/RBAC, validação (Zod), erros, limite de tentativas
-│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias, publicacoes
+│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias, publicacoes, avaliacoes
 ├── test/                                     unidade (Prisma em memória) e integracao/ (PostgreSQL)
 ├── scripts/testar-integracao.js              migra o banco de teste e roda test/integracao
 ├── prisma/
@@ -221,4 +250,5 @@ backend/
 
 - Calibrar os cortes do Fuzzy Match com a planilha histórica.
 - Importação da planilha de transição (`Credenciamento2026.xlsx`), quando o layout estiver disponível.
-- Motor de cálculo da Resolução nº 1/2025 e troca do `localStorage` do front end pela API.
+- Processamento em lote assíncrono, exportação XLSX/CSV, envio de pareceres por e-mail.
+- Troca do `localStorage` do front end pela API.

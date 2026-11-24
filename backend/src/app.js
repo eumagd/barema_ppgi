@@ -14,6 +14,7 @@ const { criarRotasDisciplinas, criarRotasTurmas } = require("./modulos/cadastros
 const { criarRotasImportacoes } = require("./modulos/importacoes/importacoes.rotas");
 const { criarRotasCorrespondencias } = require("./modulos/correspondencias/correspondencias.rotas");
 const { criarRotasPublicacoes, criarRotasAutores } = require("./modulos/publicacoes/publicacoes.rotas");
+const { criarRotasAvaliacoes, criarRotasCalculoDocente } = require("./modulos/avaliacoes/avaliacoes.rotas");
 const { autenticar } = require("./middlewares/autenticacao");
 const { rotaNaoEncontrada, tratarErros } = require("./middlewares/erros");
 
@@ -38,7 +39,7 @@ function criarApp({ prisma, email }) {
   app.use("/api/auth", criarRotasAuth({ prisma, email }));
   app.use("/api/resolucoes", criarRotasParametros({ prisma }));
   app.use("/api/qualis", criarRotasQualis({ prisma }));
-  app.use("/api/docentes", autenticar, criarRotasDocentes({ prisma }));
+  app.use("/api/docentes", autenticar, criarRotasDocentes({ prisma }), criarRotasCalculoDocente({ prisma }));
   app.use("/api/discentes", autenticar, criarRotasDiscentes({ prisma }));
   app.use("/api/externos", autenticar, criarRotasExternos({ prisma }));
   app.use("/api/disciplinas", autenticar, criarRotasDisciplinas({ prisma }));
@@ -47,6 +48,7 @@ function criarApp({ prisma, email }) {
   app.use("/api/correspondencias", criarRotasCorrespondencias({ prisma }));
   app.use("/api/publicacoes", autenticar, criarRotasPublicacoes({ prisma }));
   app.use("/api/autores", autenticar, criarRotasAutores({ prisma }));
+  app.use("/api/avaliacoes", autenticar, criarRotasAvaliacoes({ prisma }));
 
   app.use(rotaNaoEncontrada);
   app.use(tratarErros);

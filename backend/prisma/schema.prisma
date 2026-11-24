@@ -308,7 +308,7 @@ model EstratoQualis {
   ano_base        Int
   area_de_atuacao String      @db.VarChar(100)
   estrato         Estrato
-  pontuacao       Decimal     @db.Decimal(6, 2)
+  pontuacao       Decimal     @db.Decimal(10, 4)
   /// Origem do estrato, exibida no perfil como no QLattes (RF-BE17).
   fonte           FonteQualis @default(CAPES)
   /// Obrigatória quando fonte = MANUAL (fila de classificação de Qualis "N").
@@ -417,7 +417,7 @@ model Avaliacao {
   tipo                      TipoAvaliacao
   data_solicitacao          DateTime        @default(now()) @db.Date
   status                    StatusAvaliacao @default(EM_ANDAMENTO)
-  pontuacao_pesquisa        Decimal?        @db.Decimal(8, 2)
+  pontuacao_pesquisa        Decimal?        @db.Decimal(10, 4)
   cumpriu_docencia          Boolean?
   cumpriu_orientacao        Boolean?
   possui_coautoria_discente Boolean?
@@ -445,7 +445,7 @@ model AvaliacaoPublicacao {
   /// false = coautoria desmarcada na revisão manual.
   considerada       Boolean  @default(true)
   /// Pontos atribuídos ao docente após a divisão entre coautores.
-  pontos_atribuidos Decimal? @db.Decimal(8, 2)
+  pontos_atribuidos Decimal? @db.Decimal(10, 4)
 
   avaliacao  Avaliacao  @relation(fields: [id_processo], references: [id_processo], onDelete: Cascade)
   publicacao Publicacao @relation(fields: [id_publicacao], references: [id_publicacao], onDelete: Cascade)
