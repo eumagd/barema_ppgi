@@ -44,6 +44,20 @@ const campos = {
     .regex(/^[0-9]{16}$/, "O ID Lattes deve ter exatamente 16 dígitos.")
     .nullable()
     .optional(),
+  orcid: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/^https?:\/\/orcid\.org\//i, "").toUpperCase())
+    .pipe(z.string().regex(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/, "ORCID inválido. Formato: 0000-0002-1825-0097."))
+    .nullable()
+    .optional(),
+  id_openalex: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/^https?:\/\/openalex\.org\//i, "").toUpperCase())
+    .pipe(z.string().regex(/^A\d{4,18}$/, "ID do OpenAlex inválido. Formato: A5021730842."))
+    .nullable()
+    .optional(),
   vinculo: z.enum(VINCULOS).nullable(),
   data_vinculo: data.nullable(),
 };

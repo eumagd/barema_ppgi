@@ -45,6 +45,19 @@
     return resposta;
   }
 
+  /** Salva o ORCID do docente (aceita a URL https://orcid.org/...). Lança o erro da API. */
+  async function saveOrcid(teacherId, orcid) {
+    await Api.patch(`/docentes/${teacherId}`, { orcid: orcid ? orcid.trim() : null });
+    await Dados.recarregar();
+  }
+
+  /** Importa a produção do docente pelo OpenAlex (Conector 2). Lança o erro da API. */
+  async function importOpenAlex(teacherId) {
+    const resposta = await Api.post(`/importacoes/openalex/${teacherId}`, {});
+    await Dados.recarregar();
+    return resposta;
+  }
+
   /** .zip com vários CSVs: devolve o lote e chama onProgress(lote) até terminar. */
   async function importZip(file, onProgress) {
     const form = new FormData();
@@ -136,7 +149,7 @@
   }
 
   PPGI.UseCases = {
-    unlinkFromPpgi, restorePpgiLink, flagNotParticipating, unflagNotParticipating, importCsv, importZip,
+    unlinkFromPpgi, restorePpgiLink, flagNotParticipating, unflagNotParticipating, importCsv, importZip, saveOrcid, importOpenAlex,
     PROCESS_TYPES, processTypeFor, candidatesFor, startProcess, generateReport, sendReport, fetchReport,
     exportProduction, resetSampleData,
   };

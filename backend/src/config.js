@@ -21,6 +21,11 @@ const config = {
   },
   frontendUrl: (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, ""),
   redefinicaoSenha: { validadeMinutos: 60 },
+  openalex: {
+    url: (process.env.OPENALEX_URL || "https://api.openalex.org").replace(/\/+$/, ""),
+    /** Chave gratuita em https://openalex.org/settings/api (sem ela, a cota diária é bem menor). */
+    chave: process.env.OPENALEX_API_KEY || "",
+  },
   smtp: {
     host: process.env.SMTP_HOST || "",
     porta: Number(process.env.SMTP_PORT) || 587,

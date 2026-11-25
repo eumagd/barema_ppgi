@@ -29,6 +29,8 @@ const MENSAGENS_CHECK = {
   correspondencia_decisao_chk: "Decisão manual precisa registrar o usuário e a data.",
   importacao_hash_chk: "Hash do arquivo inválido.",
   publicacao_mescla_chk: "Uma publicação não pode ser mesclada nela mesma.",
+  docente_orcid_chk: "ORCID inválido. Formato: 0000-0002-1825-0097.",
+  docente_id_openalex_chk: "ID do OpenAlex inválido. Formato: A5021730842.",
 };
 
 /**
