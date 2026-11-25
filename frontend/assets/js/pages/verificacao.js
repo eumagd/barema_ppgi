@@ -48,7 +48,7 @@
     if (surplus <= 0) return "";
     return `<div class="mt-4 flex items-start gap-3 border border-black/20 bg-ppgi-yellow px-4 py-3">
       <span aria-hidden="true" class="mt-1 h-3 w-3 shrink-0 bg-black ring-1 ring-black/20"></span>
-      <p class="text-[14px] font-semibold leading-relaxed text-black">A4+ excedente: ${check.production[0].measured} em estratos A1–A4 contra ${Catalog.RULES.minUpperStrata} previstas, ${Format.plural(surplus, "produção", "produções")} acima do mínimo, computadas como folga no parecer.</p>
+      <p class="text-[14px] font-semibold leading-relaxed text-black">${esc(check.production.find((r) => r.code === "PESQUISA_PERIODICOS").req)}: ${Format.plural(surplus, "periódico", "periódicos")} acima do mínimo, computado(s) como folga no parecer.</p>
     </div>`;
   }
 
@@ -60,7 +60,7 @@
         head: ["Requisito", "Previsto na resolução", "Apurado no período", "Folga", "Situação"],
         rows: matrixRows(check),
         caption: "Requisitos previstos e apurados",
-        footnote: `Dados fictícios. Requisitos conforme ${Catalog.CYCLE.resolution} do PPGI/UFAL.`,
+        footnote: `Requisitos conforme ${Catalog.CYCLE.resolution} do PPGI/UFAL.`,
       }) + surplusCallout(check),
     });
   }
@@ -106,8 +106,10 @@
   function render() {
     const t = teacher();
     const check = Barema.checkRequirements(teacherId, Repository.currentPeriod());
+    const avisos = check.warnings.concat(check.exceptions.map((e) => e.descricao));
     return `${TeacherHeader.render(t, "verificacao")}
       ${eligibleNotAccreditedBanner(t, check)}
+      ${avisos.length ? `<div class="mb-5">${UI.alert({ tone: "info", title: "Observações do cálculo", body: avisos.map(esc).join("<br>") })}</div>` : ""}
       <div class="mb-6 flex flex-wrap items-end gap-3">
         <div class="w-full sm:w-56">${PeriodField.render()}</div>
         ${UI.button("⟳ Reavaliar requisitos", { variant: "outline", action: "reevaluate" })}

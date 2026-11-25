@@ -9,12 +9,15 @@ const { PrismaClient } = require("@prisma/client");
 const request = require("supertest");
 const { criarApp } = require("../../src/app");
 const { hashSenha } = require("../../src/lib/senha");
+const { PARAMETROS } = require("../../src/dominio/parametros-resolucao-1-2025");
 
 require("dotenv").config({ quiet: true });
 const URL_TESTE = process.env.DATABASE_URL_TESTE;
 const pular = !URL_TESTE && "DATABASE_URL_TESTE não definida (veja backend/README.md)";
 
 let prisma;
+/** E-mails "enviados" pela API durante os testes. */
+const emailsEnviados = [];
 function obterPrisma() {
   if (URL_TESTE && URL_TESTE === process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL_TESTE não pode ser igual à DATABASE_URL: os testes apagam os dados.");
@@ -40,15 +43,22 @@ async function limparBanco() {
 
 /** App + cliente HTTP já autenticado com o perfil pedido. */
 async function clienteAutenticado(perfil = "SECRETARIA") {
-  const app = criarApp({ prisma: obterPrisma(), email: { async enviar() {} } });
+  const app = criarApp({ prisma: obterPrisma(), email: { async enviar(msg) { emailsEnviados.push(msg); } } });
   const email = perfil === "SECRETARIA" ? "secretaria@teste.br" : "coordenacao@teste.br";
   const { body } = await request(app).post("/api/auth/login").send({ email, senha: "senha123" });
   const comToken = (metodo) => (url) => request(app)[metodo](url).set("Authorization", `Bearer ${body.token}`);
   return { app, get: comToken("get"), post: comToken("post"), patch: comToken("patch"), put: comToken("put"), delete: comToken("delete") };
 }
 
+/** Resolução nº 1/2025 com os parâmetros iniciais (os testes de cálculo precisam dela). */
+async function criarResolucao() {
+  const resolucao = await obterPrisma().resolucao.create({ data: { numero_ano: "1/2025", data_vigencia: new Date("2025-01-01") } });
+  await obterPrisma().parametro.createMany({ data: PARAMETROS.map((p) => ({ ...p, id_resolucao: resolucao.id_resolucao })) });
+  return resolucao;
+}
+
 async function encerrar() {
   if (prisma) await prisma.$disconnect();
 }
 
-module.exports = { pular, obterPrisma, limparBanco, clienteAutenticado, encerrar };
+module.exports = { emailsEnviados, pular, obterPrisma, limparBanco, clienteAutenticado, criarResolucao, encerrar };

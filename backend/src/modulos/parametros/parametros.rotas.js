@@ -9,6 +9,7 @@ const { z } = require("zod");
 const { validar } = require("../../middlewares/validar");
 const { autenticar, exigirPerfil, PERFIS } = require("../../middlewares/autenticacao");
 const { Erros } = require("../../lib/erros");
+const { PARAMETROS } = require("../../dominio/parametros-resolucao-1-2025");
 
 const ESTRATOS = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4", "C"];
 const naoNegativo = z.number().min(0);
@@ -31,6 +32,7 @@ const FORMATOS = {
   "orientacao.teto_permanente": z.number().int().min(1),
   "docencia.janela_meses": meses,
   "docencia.minimo_disciplinas": z.number().int().min(0),
+  "docencia.niveis": z.array(z.enum(["GRADUACAO", "POS_GRADUACAO"])).min(1),
   "recem_credenciado.meses": meses,
   "progressao_colaborador.meses_vinculo": meses,
   "colaboradores.teto_percentual": z.number().min(0).max(100),
@@ -77,9 +79,12 @@ function criarRotasParametros({ prisma }) {
       await exigirResolucao(id);
       if (chave.startsWith("fuzzy.corte_")) await validarCortesFuzzy(prisma, id, chave, valor);
 
-      const atualizado = await prisma.parametro.update({
+      // upsert: chaves criadas depois do seed ainda não existem em bancos antigos.
+      const descricao = PARAMETROS.find((p) => p.chave === chave)?.descricao;
+      const atualizado = await prisma.parametro.upsert({
         where: { id_resolucao_chave: { id_resolucao: id, chave } },
-        data: { valor },
+        create: { id_resolucao: id, chave, valor, descricao },
+        update: { valor },
       });
       res.json({ chave: atualizado.chave, valor: atualizado.valor, descricao: atualizado.descricao });
     },

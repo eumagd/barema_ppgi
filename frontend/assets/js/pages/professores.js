@@ -11,8 +11,6 @@
   const { Shell, UI, Repository, UseCases, Feedback, Format, Catalog, TeacherHeader } = PPGI;
   const { escapeHtml: esc, normalize } = Format;
 
-  const SYNC_DURATION_MS = 2400;
-  const SYNC_TICK_MS = 120;
 
   const LINK_FILTERS = [
     { value: "todos", label: "Todos do IC", accepts: () => true },
@@ -52,7 +50,7 @@
     if (state.sync.phase === "running") {
       return `<div class="mb-5">${UI.alert({
         tone: "info",
-        title: "Sincronizando o Currículo Lattes de todos os docentes…",
+        title: "Importando os currículos do QLattes…",
         body: `Você pode continuar usando o sistema; avisaremos quando terminar.
           <div class="mt-2 h-2 w-full border border-ppgi bg-white" role="progressbar" aria-label="Progresso da sincronização" aria-valuemin="0" aria-valuemax="100">
             <div id="sync-progress" class="progress-fill h-full bg-ppgi" style="width:0%"></div>
@@ -65,12 +63,12 @@
       ? UI.alert({
           tone: "error",
           title: Format.plural(r.failed.length, "docente não foi sincronizado", "docentes não foram sincronizados"),
-          body: `${r.failed.map((t) => esc(t.name)).join(" e ")}: link do Currículo Lattes ausente no cadastro. Peça à secretaria que informe o link e sincronize novamente.`,
+          body: `${r.failed.map((t) => esc(t.name)).join("<br>")}`,
           actions: UI.button("Fechar", { variant: "outline", action: "dismiss-sync" }),
         })
       : "";
     return `<div class="mb-5 space-y-2">
-      ${UI.alert({ tone: "ok", title: `Sincronização concluída em ${r.date} às ${r.time} — ${r.synced} de ${r.total} atualizados` })}
+      ${UI.alert({ tone: "ok", title: `Importação concluída em ${r.date} às ${r.time} — ${r.synced} de ${r.total} currículos` })}
       ${failure}
     </div>`;
   }
@@ -87,9 +85,8 @@
   }
 
   function filterBar() {
-    const departments = [{ value: "todos", label: "Todos os departamentos" }].concat(
-      Catalog.DEPARTMENTS.map((d) => ({ value: d, label: d })),
-    );
+    const doBanco = [...new Set(Repository.allTeachers().map((t) => t.department).filter((d) => d && d !== "—"))].sort();
+    const departments = [{ value: "todos", label: "Todos os departamentos" }].concat(doBanco.map((d) => ({ value: d, label: d })));
     return `<div class="mb-4 space-y-3">
       <div>
         <span class="mb-1 block text-[14px] font-semibold text-ppgi">Vínculo</span>
@@ -124,7 +121,7 @@
     const total = Repository.allTeachers().length;
     const head = ["Docente", "Departamento", "Vínculo institucional", "PPGI"].concat(showsPpgiActions() ? ["Ação"] : []);
     const list = teachers.length
-      ? UI.table({ head, rows: teachers.map(teacherRow), caption: "Docentes do Instituto de Computação", footnote: "Dados fictícios, apenas para demonstração." })
+      ? UI.table({ head, rows: teachers.map(teacherRow), caption: "Docentes do Instituto de Computação", footnote: "Dados do servidor do PPGI." })
       : UI.emptyState("Nenhum docente encontrado com esses critérios. Revise a busca ou os filtros.");
     return `<p class="mb-2 text-[13px] text-muted" aria-live="polite">Mostrando ${teachers.length} de ${total} docentes</p>${list}`;
   }
@@ -136,36 +133,54 @@
       ${undoBanner()}
       ${UI.panel({
         title,
-        actions: UI.button(syncing ? "⟳ Sincronizando…" : "⟳ Sincronizar Lattes de todos", { variant: "outline", action: "confirm-sync", disabled: syncing }),
+        actions: UI.button(syncing ? "⟳ Importando…" : "⤒ Importar currículos (QLattes)", { variant: "outline", action: "confirm-sync", disabled: syncing }),
         body: filterBar() + teacherTable(),
       })}`;
   }
 
-  /* ---------- Sincronização (simulada) ---------- */
-  function runSync() {
+  /* ---------- Importação do QLattes (.zip com um CSV por docente) ---------- */
+  let arquivoEscolhido = null;
+  document.addEventListener("change", (e) => {
+    if (e.target && e.target.id === "arquivo-qlattes") arquivoEscolhido = e.target.files[0] || null;
+  });
+
+  async function runSync() {
+    const arquivo = arquivoEscolhido;
+    arquivoEscolhido = null;
+    if (!arquivo) return Feedback.toast("Escolha o arquivo .zip (ou .csv) exportado pelo QLattes.", "error");
+    if (/\.csv$/i.test(arquivo.name)) {
+      return Feedback.toast("Para um CSV de um docente só, use “Importar CSV do QLattes” no perfil dele.", "error");
+    }
     state.sync = { phase: "running", result: null };
     view.refresh();
-    const started = Date.now();
-    const timer = setInterval(() => {
-      const pct = Math.min(100, ((Date.now() - started) / SYNC_DURATION_MS) * 100);
-      const bar = document.getElementById("sync-progress");
-      if (bar) bar.style.width = `${pct}%`;
-      if (pct < 100) return;
-      clearInterval(timer);
-      state.sync = { phase: "done", result: UseCases.syncAllLattes() };
-      view.refresh();
-      Feedback.toast("Sincronização do Lattes concluída.");
-    }, SYNC_TICK_MS);
+    try {
+      const lote = await UseCases.importZip(arquivo, (andamento) => {
+        const feitos = andamento.itens.filter((i) => !["PENDENTE", "PROCESSANDO"].includes(i.status)).length;
+        const bar = document.getElementById("sync-progress");
+        if (bar) bar.style.width = `${Math.round((feitos / Math.max(1, andamento.total)) * 100)}%`;
+      });
+      const { date, time } = Format.nowStamp();
+      const failed = lote.itens.filter((i) => i.status === "FALHA").map((i) => ({ name: `${i.arquivo} (${i.erro})` }));
+      state.sync = { phase: "done", result: { date, time, total: lote.total, synced: lote.total - failed.length, failed } };
+      Feedback.toast("Importação do QLattes concluída.");
+    } catch (erro) {
+      state.sync = { phase: "idle", result: null };
+      Feedback.toast(erro.message, "error");
+    }
+    view.refresh();
   }
 
   function confirmSync() {
-    const total = Repository.allTeachers().length;
+    arquivoEscolhido = null;
     Feedback.openModal({
-      title: "Sincronizar todos os docentes?",
-      body: `A produção dos <strong>${total} docentes do IC</strong> será atualizada a partir do Currículo Lattes (via QLattes). A operação pode levar alguns minutos. Os cálculos já gerados só mudam quando forem refeitos.`,
+      title: "Importar currículos do QLattes",
+      body: `<p>No Currículo Lattes de cada docente, use o botão <strong>Exportar dados</strong> do QLattes e junte os CSVs num arquivo <strong>.zip</strong>. Cada arquivo é ligado ao docente pelo ID Lattes (ou pelo nome).</p>
+        <label for="arquivo-qlattes" class="mt-3 block text-[14px] font-semibold text-ppgi">Arquivo .zip</label>
+        <input id="arquivo-qlattes" type="file" accept=".zip" class="mt-1 block w-full border border-ppgi-soft p-2 text-[14px]">
+        <p class="mt-2 text-[13px] text-muted">O processamento continua em segundo plano; o Fuzzy Match roda ao fim de cada currículo.</p>`,
       actions: [
         { text: "Cancelar", variant: "outline" },
-        { text: `Sincronizar ${total} docentes`, onClick: runSync },
+        { text: "Importar", onClick: runSync },
       ],
     });
   }
@@ -178,7 +193,7 @@
       body: `<strong>${esc(teacher.name)}</strong> deixará de aparecer como docente do PPGI. Os dados do Lattes e o histórico de credenciamento continuam guardados. Você poderá desfazer logo em seguida.`,
       actions: [
         { text: "Cancelar", variant: "outline" },
-        { text: "Sim, desvincular", variant: "danger", onClick: () => { state.lastUnlinked = UseCases.unlinkFromPpgi(teacher.id); view.refresh(); } },
+        { text: "Sim, desvincular", variant: "danger", onClick: async () => { state.lastUnlinked = await UseCases.unlinkFromPpgi(teacher.id); view.refresh(); } },
       ],
     });
   }

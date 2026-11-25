@@ -3,41 +3,24 @@
  *   POST /api/qualis/cargas      multipart: arquivo (.csv), fonte (CAPES|PUC_RS|SCOPUS|EVENTOS), ano_base, area?
  *   GET  /api/qualis/cargas      histórico das cargas
  *   GET  /api/qualis/veiculos    ?busca=&tipo=PERIODICO|CONFERENCIA&area=  → estratos por fonte e o vigente
+ *   GET  /api/qualis/pendentes   fila de classificação manual: veículos com publicações e sem estrato (RF-BE05)
+ *   POST /api/qualis/classificacoes   { id_veiculo, estrato, justificativa, ano_base? } → estrato MANUAL
  */
 const { Router } = require("express");
-const multer = require("multer");
 const { z } = require("zod");
 const { validar } = require("../../middlewares/validar");
 const { autenticar } = require("../../middlewares/autenticacao");
+const { receberArquivo } = require("../../middlewares/upload");
 const { Erros } = require("../../lib/erros");
 const { criarServicoQualis, AREA_PADRAO } = require("./qualis.servico");
-const { FORMATOS } = require("./formatos");
+const { FORMATOS, ESTRATOS } = require("./formatos");
+const { PESOS_ESTRATO } = require("../../dominio/parametros-resolucao-1-2025");
 
-const TAMANHO_MAXIMO = 25 * 1024 * 1024;
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: TAMANHO_MAXIMO, files: 1 },
-  fileFilter: (_req, arquivo, cb) => {
-    const ehCsv = /\.(csv|txt)$/i.test(arquivo.originalname);
-    cb(ehCsv ? null : Erros.requisicaoInvalida("Envie um arquivo .csv (exporte a planilha como CSV)."), ehCsv);
-  },
+const receberCsv = receberArquivo({
+  extensoes: ["csv", "txt"],
+  tamanhoMaximoMb: 25,
+  mensagemExtensao: "Envie um arquivo .csv (exporte a planilha como CSV).",
 });
-
-/** Converte erros do multer (tamanho, campo errado) em mensagens claras. */
-function receberArquivo(req, res, next) {
-  upload.single("arquivo")(req, res, (erro) => {
-    if (!erro) return next();
-    if (erro instanceof multer.MulterError) {
-      const mensagem =
-        erro.code === "LIMIT_FILE_SIZE"
-          ? `Arquivo maior que ${TAMANHO_MAXIMO / 1024 / 1024} MB.`
-          : `Envie um único arquivo no campo "arquivo" (${erro.code}).`;
-      return next(Erros.requisicaoInvalida(mensagem));
-    }
-    return next(erro);
-  });
-}
 
 const esquemaCarga = z.object({
   fonte: z.enum(Object.keys(FORMATOS), { error: `Fonte inválida. Use: ${Object.keys(FORMATOS).join(", ")}.` }),
@@ -57,8 +40,7 @@ function criarRotasQualis({ prisma }) {
   const rotas = Router();
   rotas.use(autenticar);
 
-  rotas.post("/cargas", receberArquivo, validar({ body: esquemaCarga }), async (req, res) => {
-    if (!req.file) throw Erros.requisicaoInvalida('Envie o arquivo no campo "arquivo".');
+  rotas.post("/cargas", receberCsv, validar({ body: esquemaCarga }), async (req, res) => {
     const { fonte, ano_base: anoBase, area } = req.validado.body;
     const { carga, reaproveitada } = await servico.carregar({
       buffer: req.file.buffer,
@@ -78,6 +60,50 @@ function criarRotasQualis({ prisma }) {
   rotas.get("/veiculos", validar({ query: esquemaBusca }), async (req, res) => {
     res.json(await servico.buscarVeiculos(req.validado.query));
   });
+
+  rotas.get("/pendentes", validar({ query: z.object({ area: z.string().trim().max(100).default(AREA_PADRAO) }) }), async (req, res) => {
+    const { area } = req.validado.query;
+    const veiculos = await prisma.veiculo.findMany({
+      where: { publicacoes: { some: { id_mesclada_em: null } }, estratos: { none: { area_de_atuacao: area } } },
+      orderBy: { nome: "asc" },
+      include: {
+        _count: { select: { publicacoes: true } },
+        publicacoes: {
+          take: 5,
+          orderBy: { ano_publicacao: "desc" },
+          select: { id_publicacao: true, titulo: true, ano_publicacao: true },
+        },
+      },
+    });
+    res.json(veiculos);
+  });
+
+  rotas.post(
+    "/classificacoes",
+    validar({
+      body: z.object({
+        id_veiculo: z.coerce.number().int().positive(),
+        estrato: z.enum(ESTRATOS),
+        justificativa: z.string().trim().min(10, "Explique a classificação (mínimo de 10 caracteres)."),
+        ano_base: z.coerce.number().int().min(2000).max(2100).default(new Date().getFullYear()),
+        area: z.string().trim().max(100).default(AREA_PADRAO),
+      }),
+    }),
+    async (req, res) => {
+      const { id_veiculo: idVeiculo, estrato, justificativa, ano_base: anoBase, area } = req.validado.body;
+      const veiculo = await prisma.veiculo.findUnique({ where: { id_veiculo: idVeiculo } });
+      if (!veiculo) throw Erros.naoEncontrado("Veículo não encontrado.");
+      const pesos = (await prisma.parametro.findFirst({ where: { chave: "pesos_estrato" }, orderBy: { resolucao: { data_vigencia: "desc" } } }))?.valor || PESOS_ESTRATO;
+      const chave = { id_veiculo: idVeiculo, ano_base: anoBase, area_de_atuacao: area, fonte: "MANUAL" };
+      const dados = { estrato, justificativa, pontuacao: pesos[estrato] ?? 0 };
+      const registro = await prisma.estratoQualis.upsert({
+        where: { id_veiculo_ano_base_area_de_atuacao_fonte: chave },
+        create: { ...chave, ...dados },
+        update: dados,
+      });
+      res.status(201).json(registro);
+    },
+  );
 
   return rotas;
 }

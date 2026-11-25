@@ -74,6 +74,13 @@ function criarPrismaFalso() {
         const { id_resolucao, chave } = where.id_resolucao_chave;
         return dados.parametros.find((p) => p.id_resolucao === id_resolucao && p.chave === chave) || null;
       },
+      async upsert({ where, create, update }) {
+        const { id_resolucao, chave } = where.id_resolucao_chave;
+        const p = dados.parametros.find((x) => x.id_resolucao === id_resolucao && x.chave === chave);
+        if (p) return Object.assign(p, update);
+        dados.parametros.push({ ...create });
+        return create;
+      },
       async update({ where, data }) {
         const { id_resolucao, chave } = where.id_resolucao_chave;
         const p = dados.parametros.find((x) => x.id_resolucao === id_resolucao && x.chave === chave);

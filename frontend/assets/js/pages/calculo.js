@@ -42,7 +42,7 @@
           head: ["Publicação", "Ano", "Qualis", "Coautores PPGI", "Pontos brutos", "Divisão", "Pontos do docente"],
           rows: score.lines.map(scoreRow).concat([totalRow(score)]),
           caption: "Produção científica e pontuação",
-          footnote: `Dados fictícios. Pontos por estrato conforme ${Catalog.CYCLE.resolution} do PPGI/UFAL.`,
+          footnote: `Pontos por estrato conforme ${Catalog.CYCLE.resolution} do PPGI/UFAL.`,
         })
       : UI.emptyState("Nenhuma publicação do docente no período selecionado.");
     return UI.panel({

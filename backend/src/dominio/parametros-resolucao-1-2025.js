@@ -26,6 +26,7 @@ const PARAMETROS = [
 
   { chave: "docencia.janela_meses", valor: 24, descricao: "Janela do critério de Docência." },
   { chave: "docencia.minimo_disciplinas", valor: 1, descricao: "Disciplinas lecionadas na janela, excluindo Estudo Dirigido." },
+  { chave: "docencia.niveis", valor: ["POS_GRADUACAO"], descricao: "Níveis de disciplina que contam para a Docência (padrão: só as do PPGI)." },
 
   { chave: "recem_credenciado.meses", valor: 24, descricao: "Até quantos meses de vínculo o docente fica isento de Orientação e Docência (Art. 4º, parágrafo único)." },
   { chave: "progressao_colaborador.meses_vinculo", valor: 12, descricao: "Vínculo mínimo como Colaborador para virar Permanente (Art. 3º, §3º)." },
@@ -36,4 +37,20 @@ const PARAMETROS = [
   { chave: "fuzzy.janela_ano", valor: 1, descricao: "Diferença máxima de ano entre publicações comparadas por similaridade." },
 ];
 
-module.exports = { PESOS_ESTRATO, PARAMETROS };
+/** { chave: valor } com os valores iniciais, para completar o que faltar no banco. */
+const PADROES = Object.fromEntries(PARAMETROS.map((p) => [p.chave, p.valor]));
+
+/**
+ * Parâmetros da resolução indicada (ou da vigente mais recente), completados com os padrões
+ * acima quando alguma chave ainda não existe no banco.
+ */
+async function carregarParametros(db, idResolucao) {
+  const resolucao = idResolucao
+    ? await db.resolucao.findUnique({ where: { id_resolucao: idResolucao } })
+    : await db.resolucao.findFirst({ where: { data_vigencia: { lte: new Date() } }, orderBy: { data_vigencia: "desc" } });
+  const salvos = resolucao ? await db.parametro.findMany({ where: { id_resolucao: resolucao.id_resolucao } }) : [];
+  const valores = { ...PADROES, ...Object.fromEntries(salvos.map((p) => [p.chave, p.valor])) };
+  return { resolucao, valores };
+}
+
+module.exports = { PESOS_ESTRATO, PARAMETROS, PADROES, carregarParametros };

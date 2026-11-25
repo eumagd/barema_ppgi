@@ -50,6 +50,14 @@ describe("autenticação", () => {
     assert.equal(res.body.perfil, "SECRETARIA");
   });
 
+  it("recusa token de usuário removido ou com perfil alterado", async () => {
+    const { body } = await entrar();
+    prisma.dados.usuarios[0].perfil = "COORDENACAO";
+    assert.equal((await request(app).get("/api/auth/eu").set("Authorization", `Bearer ${body.token}`)).status, 401);
+    prisma.dados.usuarios.splice(0, 1);
+    assert.equal((await request(app).get("/api/auth/eu").set("Authorization", `Bearer ${body.token}`)).status, 401);
+  });
+
   it("recuperação responde igual com ou sem cadastro, e só envia e-mail a quem existe", async () => {
     const existe = await request(app).post("/api/auth/recuperar-senha").send({ email: "coordenacao@ic.ufal.br" });
     const naoExiste = await request(app).post("/api/auth/recuperar-senha").send({ email: "fulano@ic.ufal.br" });

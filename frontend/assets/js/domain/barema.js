@@ -1,105 +1,79 @@
 /*
- * domain/barema — regras de negócio: pontuação da produção e verificação de requisitos.
- * Funções puras sobre os dados do repository; não conhecem HTML.
+ * domain/barema — pontuação e requisitos de cada docente.
+ *
+ * O cálculo é feito no back end (motor da Resolução nº 1/2025, GET /api/docentes/:id/calculo);
+ * aqui só convertemos o resultado para o formato que as telas usam.
  */
 (function (PPGI) {
   "use strict";
 
-  const { Catalog, Repository, Format } = PPGI;
-  const { RULES, QUALIS_POINTS, UPPER_STRATA, TOP_STRATA } = Catalog;
+  const { Dados, Format } = PPGI;
 
-  /* ---------- Cálculo da pontuação ---------- */
-  function scoreLine(pub, teacher) {
-    const raw = QUALIS_POINTS[pub.qualis];
-    const ppgiAuthors = Repository.ppgiAuthorsOf(pub);
-    const shouldSplit = Boolean(teacher.ppgi) && Repository.isCoauthorshipConfirmed(pub) && ppgiAuthors.length > 1;
-    const divisor = shouldSplit ? ppgiAuthors.length : 1;
-    return { pub, raw, ppgiAuthorsCount: Math.max(ppgiAuthors.length, 1), divisor, points: raw / divisor };
-  }
+  const GRUPOS = [
+    { prefixo: "PESQUISA", nome: "Produção científica" },
+    { prefixo: "ORIENTACAO", nome: "Orientação" },
+    { prefixo: "DOCENCIA", nome: "Docência" },
+    { prefixo: "", nome: "Regras da resolução" },
+  ];
 
-  function sum(items, pick) {
-    return items.reduce((total, item) => total + pick(item), 0);
-  }
+  /** Enquanto o cálculo do período não chega da API. */
+  const VAZIO = {
+    pesquisa: { total: 0, bruto: 0, desconto_coautoria: 0, por_estrato: [], linhas: [] },
+    requisitos: [],
+    atendidos: 0,
+    apto: false,
+    avisos: ["Carregando o cálculo do período…"],
+    excecoes: [],
+  };
 
-  function scoreByStratum(lines) {
-    return Catalog.STRATA.map((stratum) => {
-      const ofStratum = lines.filter((l) => l.pub.qualis === stratum);
-      return { stratum, count: ofStratum.length, points: sum(ofStratum, (l) => l.points) };
-    }).filter((row) => row.count > 0);
-  }
+  const obter = (teacherId, period) => Dados.calculo(teacherId, period) || VAZIO;
 
   function computeScore(teacherId, period) {
-    const teacher = Repository.findTeacher(teacherId);
-    const lines = Repository.publicationsOf(teacherId, period).map((pub) => scoreLine(pub, teacher));
-    const raw = sum(lines, (l) => l.raw);
-    const total = sum(lines, (l) => l.points);
+    const c = obter(teacherId, period);
+    const lines = c.pesquisa.linhas
+      .filter((l) => l.considerada)
+      .map((l) => ({
+        pub: { id: String(l.id_publicacao), title: l.titulo, venue: l.veiculo || "—", year: l.ano, qualis: l.estrato || "N", coauthors: l.coautores || [] },
+        raw: l.peso,
+        ppgiAuthorsCount: l.divisor,
+        divisor: l.divisor,
+        points: l.pontos,
+        withStudent: l.com_discente,
+      }));
     return {
       lines,
-      raw,
-      total,
-      coauthorshipDiscount: raw - total,
+      raw: c.pesquisa.bruto,
+      total: c.pesquisa.total,
+      coauthorshipDiscount: c.pesquisa.desconto_coautoria,
       splitCount: lines.filter((l) => l.divisor > 1).length,
-      byStratum: scoreByStratum(lines),
+      byStratum: c.pesquisa.por_estrato.map((s) => ({ stratum: s.estrato, count: s.quantidade, points: s.pontos })),
     };
   }
 
-  /* ---------- Verificação de requisitos ---------- */
-  function requirement(req, expected, measured, slack, met) {
-    return { req, expected, measured, slack, met };
-  }
+  /** "≥ 2.5 pontos" → 2.5 */
+  const numeroExigido = (texto) => Number((String(texto).match(/-?\d+(?:[.,]\d+)?/) || [])[0]?.replace(",", "."));
 
-  function countLabel(n) {
-    return Format.plural(n, "produção", "produções");
-  }
-
-  function productionRequirements(score, period) {
-    const pubs = score.lines.map((l) => l.pub);
-    const upper = pubs.filter((p) => UPPER_STRATA.includes(p.qualis)).length;
-    const top = pubs.filter((p) => TOP_STRATA.includes(p.qualis)).length;
-    const yearsWithOutput = period.years.filter((y) => pubs.some((p) => p.year === y)).length;
-    const scoreSlack = Math.round((score.total - RULES.minScore) * 10) / 10;
-    return [
-      requirement("Publicações A4+ (estratos A1 a A4)", `≥ ${RULES.minUpperStrata} produções`, countLabel(upper), Format.formatSigned(upper - RULES.minUpperStrata), upper >= RULES.minUpperStrata),
-      requirement("Publicações em estratos A1/A2", `≥ ${RULES.minTopStrata} produções`, countLabel(top), Format.formatSigned(top - RULES.minTopStrata), top >= RULES.minTopStrata),
-      requirement("Pontuação mínima de Pesquisa", `≥ ${RULES.minScore} pts`, `${Format.formatNumber(score.total)} pts`, Format.formatSigned(scoreSlack), score.total >= RULES.minScore),
-      requirement("Produção em todos os anos do período", "≥ 1 por ano", `${yearsWithOutput} de ${period.years.length} anos`, Format.formatSigned(yearsWithOutput - period.years.length), yearsWithOutput === period.years.length),
-    ];
-  }
-
-  function teachingRequirements(teacher, period) {
-    const perYear = period.years.map((y) => ({ year: y, count: teacher.undergradCourses[y] || 0 }));
-    const yearsWithout = perYear.filter((y) => y.count < 1).length;
-    const graduate = sum(period.years, (y) => teacher.gradCourses[y] || 0);
-    return [
-      requirement("Disciplinas na graduação (IC)", "≥ 1 por ano", perYear.map((y) => `${y.count} (${y.year})`).join(" · "), Format.formatSigned(-yearsWithout), yearsWithout === 0),
-      requirement("Disciplinas na pós-graduação (PPGI)", "≥ 1 no período", Format.plural(graduate, "disciplina", "disciplinas"), Format.formatSigned(graduate - 1), graduate >= 1),
-    ];
-  }
-
-  function advisingRequirements(teacher, period) {
-    const finished = teacher.finishedAdvisingYears.filter((y) => period.years.includes(y)).length;
-    return [
-      requirement("Orientações em andamento", "≥ 1 orientação", `${teacher.ongoingAdvising} em andamento`, Format.formatSigned(teacher.ongoingAdvising - 1), teacher.ongoingAdvising >= 1),
-      requirement("Orientações concluídas no período", "≥ 1 concluída", Format.plural(finished, "concluída", "concluídas"), Format.formatSigned(finished - 1), finished >= 1),
-    ];
-  }
-
-  function registrationRequirements(teacher) {
-    return [
-      requirement("Vínculo efetivo com a UFAL", "Docente efetivo", teacher.employment, "—", teacher.employment === "Efetivo"),
-      requirement("Currículo Lattes sincronizado", "Link informado e sincronizado", teacher.lattesSync ? `Sincronizado em ${teacher.lattesSync}` : "Link ausente no cadastro", "—", Boolean(teacher.lattesSync)),
-    ];
+  function item(r) {
+    const exigido = numeroExigido(r.exigido);
+    const obtido = typeof r.obtido === "number" ? r.obtido : null;
+    const folga = obtido != null && Number.isFinite(exigido) ? Math.round((obtido - exigido) * 1000) / 1000 : null;
+    const sinalInvertido = String(r.exigido).trim().startsWith("≤");
+    return {
+      code: r.codigo,
+      req: r.descricao,
+      expected: String(r.exigido).replace(/(\d)\.(\d)/g, "$1,$2"),
+      measured: obtido != null ? Format.formatNumber(obtido) : String(r.obtido),
+      slack: folga == null ? "—" : Format.formatSigned(sinalInvertido ? -folga : folga),
+      met: r.atendido,
+    };
   }
 
   function checkRequirements(teacherId, period) {
-    const teacher = Repository.findTeacher(teacherId);
-    const score = computeScore(teacherId, period);
-    const groups = [
-      { name: "Produção científica", items: productionRequirements(score, period) },
-      { name: "Docência", items: teachingRequirements(teacher, period) },
-      { name: "Orientação", items: advisingRequirements(teacher, period) },
-      { name: "Vínculo e cadastro", items: registrationRequirements(teacher) },
-    ];
+    const c = obter(teacherId, period);
+    const groups = GRUPOS.map((g) => ({
+      name: g.nome,
+      items: c.requisitos.filter((r) => (g.prefixo ? r.codigo.startsWith(g.prefixo) : !GRUPOS.some((x) => x.prefixo && r.codigo.startsWith(x.prefixo)))).map(item),
+    })).filter((g) => g.items.length);
     const items = groups.flatMap((g) => g.items.map((i) => Object.assign({ group: g.name }, i)));
     const metCount = items.filter((i) => i.met).length;
     return {
@@ -107,16 +81,21 @@
       items,
       metCount,
       total: items.length,
-      eligible: metCount === items.length,
+      eligible: c.apto,
       unmet: items.filter((i) => !i.met),
-      production: groups[0].items,
-      score,
+      production: (groups.find((g) => g.name === "Produção científica") || { items: [] }).items,
+      score: computeScore(teacherId, period),
+      type: c.tipo,
+      warnings: c.avisos || [],
+      exceptions: c.excecoes || [],
+      progression: c.progressao || null,
     };
   }
 
+  /** Folga no requisito de periódicos (quantos acima do mínimo). */
   function upperStrataSurplus(result) {
-    const upper = result.production[0];
-    return upper.met ? parseInt(upper.slack.replace("+", ""), 10) || 0 : 0;
+    const periodicos = result.production.find((r) => r.code === "PESQUISA_PERIODICOS");
+    return periodicos && periodicos.met ? parseInt(periodicos.slack.replace("+", ""), 10) || 0 : 0;
   }
 
   PPGI.Barema = { computeScore, checkRequirements, upperStrataSurplus };

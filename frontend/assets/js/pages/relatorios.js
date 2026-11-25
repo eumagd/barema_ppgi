@@ -117,7 +117,7 @@
           </div>
           ${coauthorshipSection(score)}
           <div class="mt-5">${UI.sectionTitle("Critérios mínimos")}${criteriaList(check)}</div>
-          <p class="mt-6 border-t border-ppgi-soft pt-3 font-mono text-[11px] text-muted">Dados fictícios, apenas para ilustração. Regras conforme ${Catalog.CYCLE.resolution} do PPGI/UFAL.</p>
+          <p class="mt-6 border-t border-ppgi-soft pt-3 font-mono text-[11px] text-muted">Regras conforme ${Catalog.CYCLE.resolution} do PPGI/UFAL.</p>
         </article>`,
     });
   }
@@ -143,11 +143,15 @@
   }
 
   /* ---------- Ações ---------- */
-  function send() {
+  async function send() {
     const t = teacher();
-    const report = UseCases.sendReport(t.id);
-    const to = state.copyCoordination ? `${t.email} (cópia: ${COORDINATION_EMAIL})` : t.email;
-    state.justSent = { to, date: report.date, time: report.time };
+    try {
+      const report = await UseCases.sendReport(t.id, { copyTo: state.copyCoordination ? COORDINATION_EMAIL : null });
+      const to = state.copyCoordination ? `${t.email} (cópia: ${COORDINATION_EMAIL})` : t.email;
+      state.justSent = { to, date: report.date, time: report.time };
+    } catch (erro) {
+      Feedback.toast(erro.message, "error");
+    }
     view.refresh();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }

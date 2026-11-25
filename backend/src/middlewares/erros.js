@@ -28,6 +28,7 @@ const MENSAGENS_CHECK = {
   correspondencia_candidato_chk: "Correspondência sem candidato válido para o tipo informado.",
   correspondencia_decisao_chk: "Decisão manual precisa registrar o usuário e a data.",
   importacao_hash_chk: "Hash do arquivo inválido.",
+  publicacao_mescla_chk: "Uma publicação não pode ser mesclada nela mesma.",
 };
 
 /**

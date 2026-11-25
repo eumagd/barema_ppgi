@@ -9,7 +9,6 @@
 
   const { Repository, Format, UI } = PPGI;
   const { escapeHtml: esc, pageUrl } = Format;
-  const DEFAULT_TEACHER = "bruno";
 
   const TABS = [
     { key: "perfil", label: "Perfil" },
@@ -21,7 +20,10 @@
 
   function resolveTeacherId() {
     const requested = Format.queryParam("d");
-    return Repository.findTeacher(requested) ? requested : DEFAULT_TEACHER;
+    if (Repository.findTeacher(requested)) return requested;
+    const primeiro = Repository.allTeachers()[0];
+    if (!primeiro) window.location.replace("professores.html");
+    return primeiro ? primeiro.id : null;
   }
 
   function teacherUrl(page, teacherId, extra) {

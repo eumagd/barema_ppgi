@@ -59,9 +59,12 @@
     state.password = form.elements.senha.value;
   }
 
-  function submit(form) {
+  async function submit(form) {
     readForm(form);
-    const result = Auth.login(state.email, state.password);
+    state.loading = true;
+    view.update();
+    const result = await Auth.login(state.email, state.password);
+    state.loading = false;
     if (!result.ok) {
       state.errors = { [result.field]: result.error };
       view.update();

@@ -1,15 +1,14 @@
 /*
- * domain/auth — acesso à plataforma (simulado no navegador para o protótipo).
- * Valida credenciais dos usuários de demonstração, mantém a sessão e trata a
- * recuperação de senha. NÃO oferece segurança real: é só para navegação.
+ * domain/auth — acesso à plataforma pela API (login com JWT, recuperação de senha).
+ * A sessão (usuário + token) fica no Store; as regras de senha são as mesmas do back end.
  */
 (function (PPGI) {
   "use strict";
 
-  const { Store, Catalog } = PPGI;
-  const KEYS = { session: "session", passwords: "passwords" };
+  const { Store, Api } = PPGI;
   const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const MIN_PASSWORD_LENGTH = 8;
+  const ROLES = { SECRETARIA: "Secretaria", COORDENACAO: "Coordenação" };
 
   function normalizeEmail(email) {
     return String(email || "").trim().toLowerCase();
@@ -19,40 +18,40 @@
     return EMAIL_PATTERN.test(normalizeEmail(email));
   }
 
-  function findUser(email) {
-    return Catalog.DEMO_USERS.find((u) => u.email === normalizeEmail(email)) || null;
-  }
-
-  function passwordOf(user) {
-    const changed = Store.read(KEYS.passwords, {});
-    return changed[user.email] || user.password;
-  }
-
-  /** Resultado: { ok: true } ou { ok: false, field: "email"|"password", error } */
-  function login(email, password) {
+  /** Resultado: { ok: true } ou { ok: false, field: "email"|"password", error }. */
+  async function login(email, password) {
     if (!normalizeEmail(email)) return { ok: false, field: "email", error: "Informe seu e-mail institucional." };
     if (!isValidEmail(email)) return { ok: false, field: "email", error: "E-mail em formato inválido. Exemplo: nome@ic.ufal.br" };
     if (!password) return { ok: false, field: "password", error: "Informe sua senha." };
-    const user = findUser(email);
-    if (!user || passwordOf(user) !== password) {
-      return { ok: false, field: "password", error: "E-mail ou senha incorretos. Confira os dados ou recupere sua senha." };
+    try {
+      const { token, usuario } = await Api.post("/auth/login", { email: normalizeEmail(email), senha: password });
+      Store.write(Api.SESSION_KEY, { token, email: usuario.email, name: usuario.nome, role: ROLES[usuario.perfil] || usuario.perfil, perfil: usuario.perfil });
+      return { ok: true };
+    } catch (erro) {
+      return { ok: false, field: erro.status === 0 ? "email" : "password", error: erro.message };
     }
-    Store.write(KEYS.session, { email: user.email, name: user.name, role: user.role });
-    return { ok: true };
   }
 
   function logout() {
-    Store.write(KEYS.session, null);
+    Store.write(Api.SESSION_KEY, null);
   }
 
   function currentUser() {
-    return Store.read(KEYS.session, null);
+    const sessao = Store.read(Api.SESSION_KEY, null);
+    return sessao && sessao.token ? sessao : null;
   }
 
-  /** Sempre responde igual para e-mails válidos, para não revelar quem tem cadastro. */
-  function requestPasswordReset(email) {
+  const isCoordination = () => (currentUser() || {}).perfil === "COORDENACAO";
+
+  /** A API responde igual com ou sem cadastro, para não revelar quem tem conta. */
+  async function requestPasswordReset(email) {
     if (!isValidEmail(email)) return { ok: false, error: "Informe um e-mail válido. Exemplo: nome@ic.ufal.br" };
-    return { ok: true, email: normalizeEmail(email) };
+    try {
+      await Api.post("/auth/recuperar-senha", { email: normalizeEmail(email) });
+      return { ok: true, email: normalizeEmail(email) };
+    } catch (erro) {
+      return { ok: false, error: erro.message };
+    }
   }
 
   function passwordRules(password, confirmation) {
@@ -65,20 +64,20 @@
     ];
   }
 
-  function resetPassword(email, password, confirmation) {
+  /** token: o do link recebido por e-mail (redefinir-senha.html?token=...&email=...). */
+  async function resetPassword(token, password, confirmation) {
     const unmet = passwordRules(password, confirmation).filter((r) => !r.ok);
     if (unmet.length) return { ok: false, error: `Revise a senha: ${unmet.map((r) => r.label.toLowerCase()).join("; ")}.` };
-    const user = findUser(email);
-    if (user) {
-      const changed = Store.read(KEYS.passwords, {});
-      changed[user.email] = password;
-      Store.write(KEYS.passwords, changed);
+    try {
+      await Api.post("/auth/redefinir-senha", { token, senha: password });
+      return { ok: true };
+    } catch (erro) {
+      return { ok: false, error: erro.message };
     }
-    return { ok: true };
   }
 
   PPGI.Auth = {
-    SESSION_KEY: KEYS.session,
-    isValidEmail, login, logout, currentUser, requestPasswordReset, passwordRules, resetPassword,
+    SESSION_KEY: Api.SESSION_KEY,
+    isValidEmail, login, logout, currentUser, isCoordination, requestPasswordReset, passwordRules, resetPassword,
   };
 })((window.PPGI = window.PPGI || {}));

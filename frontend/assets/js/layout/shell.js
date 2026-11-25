@@ -15,6 +15,7 @@
     { key: "painel", label: "Painel", href: "painel.html", icon: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>' },
     { key: "docentes", label: "Docentes", href: "professores.html", icon: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5-4-6"/>' },
     { key: "credenciamento", label: "Credenciamento", href: "credenciamento.html", icon: '<path d="M9 12l2 2 4-4"/><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/>' },
+    { key: "revisao", label: "Revisão", href: "revisao.html", icon: '<path d="M4 6h16M4 12h10M4 18h7"/><circle cx="17" cy="16" r="3"/><path d="M19.5 18.5L22 21"/>' },
   ];
 
   /* ---------- Acesso ---------- */
@@ -45,7 +46,7 @@
       <nav class="flex-1 overflow-y-auto py-3">${NAV_ITEMS.map((i) => navLink(i, activeKey)).join("")}</nav>
       <div class="space-y-2 border-t border-ppgi-soft px-4 py-3">
         <p class="text-[12px] leading-snug text-muted">Ciclo ${Catalog.CYCLE.year} · prazo ${Catalog.CYCLE.deadline}<br>${esc(Catalog.CYCLE.resolution)}</p>
-        <button type="button" data-shell="reset" class="text-[12px] text-muted underline underline-offset-2 hover:text-ppgi">Restaurar dados de demonstração</button>
+        <button type="button" data-shell="reset" class="text-[12px] text-muted underline underline-offset-2 hover:text-ppgi">⟳ Recarregar dados do servidor</button>
       </div>
     </aside>
     <div id="sidebar-backdrop" data-shell="close-menu" class="fixed inset-0 z-30 hidden bg-black/50 lg:hidden"></div>`;
@@ -105,14 +106,7 @@
   }
 
   function confirmReset() {
-    Feedback.openModal({
-      title: "Restaurar dados de demonstração?",
-      body: "As ações feitas nesta demonstração (desvínculos, envios, sinalizações, coautorias revisadas, processos iniciados) serão desfeitas. Você continua conectado.",
-      actions: [
-        { text: "Cancelar", variant: "outline" },
-        { text: "Restaurar", onClick: () => { UseCases.resetSampleData(); window.location.reload(); } },
-      ],
-    });
+    UseCases.resetSampleData().then(() => Feedback.toast("Dados atualizados."), (e) => Feedback.toast(e.message, "error"));
   }
 
   function logout() {
@@ -167,13 +161,15 @@
     });
 
     renderChrome();
-    return {
+    const atual = {
       refresh() {
         renderChrome();
         view.update();
       },
     };
+    PPGI.Shell.atual = atual;
+    return atual;
   }
 
-  PPGI.Shell = { start };
+  PPGI.Shell = { start, atual: null };
 })((window.PPGI = window.PPGI || {}));
