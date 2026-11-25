@@ -55,6 +55,8 @@ e-mail; sem SMTP configurado no back end, o link aparece no console da API.
 | `verificacao.html?d=<id>` | Verificação de requisitos (exporta CSV) |
 | `relatorios.html?d=<id>` | Relatório do docente (PDF pela impressão, envio por e-mail) |
 | `credenciamento.html` | Credenciamento/recredenciamento individual ou em lote, com conferência dos requisitos. Também `?d=<id>` (aba do docente) e `?modo=lote` |
+| `cadastros.html` | Cadastros: docentes, discentes (orientador e coorientações), membros externos, disciplinas e turmas, e publicação manual (eventos e coautores). Atalho: `?aba=discentes` |
+| `qualis.html` | Bases Qualis: envio das tabelas (CAPES, PUC-RS, Scopus, Eventos), histórico de cargas e consulta do estrato de um veículo |
 | `revisao.html` | Revisão: coautorias do Fuzzy Match (confirmar, rejeitar, desfazer mescla, reprocessar) e veículos sem estrato Qualis (classificação manual com justificativa). Atalho: `?aba=qualis` |
 
 `<id>` é o número do docente no banco (`id_docente`).
@@ -104,7 +106,8 @@ assets/
     │   ├── components.js    componentes do design system (funções dados → HTML)
     │   ├── feedback.js      modal acessível e toasts
     │   ├── export.js        CSV e impressão
-    │   └── view.js          render + delegação de eventos (data-action/change/input/submit)
+    │   ├── formulario.js    campos com name, leitura do formulário e mensagens de erro da API
+    │   └── view.js          render + delegação de eventos; preserva formulários com data-preservar
     ├── layout/
     │   ├── public.js        site público e telas de acesso
     │   ├── shell.js         área interna: guarda de login, menu, cabeçalho, usuário
