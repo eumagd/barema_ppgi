@@ -52,6 +52,8 @@
       ppgi: VINCULOS[d.vinculo] || null,
       vinculo: d.vinculo,
       id_lattes: d.id_lattes,
+      orcid: d.orcid,
+      id_openalex: d.id_openalex,
       // Sem ID nem link do Lattes, o docente fica fora da importação em lote.
       lattesSync: d.data_ultima_atualizacao ? dataBr(d.data_ultima_atualizacao) : d.id_lattes || d.url_lattes ? "não importado" : null,
       process: processo(av),

@@ -5,6 +5,8 @@
  *   GET  /api/importacoes      ?id_docente=&status=  histórico (só cargas de currículo)
  *   GET  /api/importacoes/:id  detalhe com contagens e erros por linha
  *   GET  /api/importacoes/lotes/:id  andamento de um .zip (202 no POST; processado em segundo plano)
+ *   POST /api/importacoes/openalex/:id_docente  { desde? }  importa a produção pela API do OpenAlex
+ *        (precisa do ORCID ou do ID do OpenAlex no cadastro do docente)
  */
 const { Router } = require("express");
 const { z } = require("zod");
@@ -13,8 +15,9 @@ const { autenticar } = require("../../middlewares/autenticacao");
 const { receberArquivo } = require("../../middlewares/upload");
 const { Erros } = require("../../lib/erros");
 const { criarServicoImportacao } = require("./importacao.servico");
+const { criarConectorOpenAlex } = require("../conectores/openalex/conector.servico");
 
-const FONTES_CURRICULO = ["QLATTES_CSV", "PLANILHA_TRANSICAO", "XML_LATTES"];
+const FONTES_CURRICULO = ["QLATTES_CSV", "PLANILHA_TRANSICAO", "XML_LATTES", "OPENALEX"];
 
 const receberCsvOuZip = receberArquivo({
   extensoes: ["csv", "zip"],
@@ -27,8 +30,9 @@ const esquemaUpload = z.object({
   confirmar_nome: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
 });
 
-function criarRotasImportacoes({ prisma }) {
+function criarRotasImportacoes({ prisma, openalex }) {
   const servico = criarServicoImportacao({ prisma });
+  const conectorOpenAlex = criarConectorOpenAlex({ prisma, ...(openalex ? { cliente: openalex } : {}) });
   const rotas = Router();
   rotas.use(autenticar);
 
@@ -46,6 +50,18 @@ function criarRotasImportacoes({ prisma }) {
     const status = resultado.lote ? 202 : resultado.reaproveitada ? 200 : 201;
     res.status(status).json(corpo);
   });
+
+  rotas.post(
+    "/openalex/:id_docente",
+    validar({
+      params: z.object({ id_docente: z.coerce.number().int().positive() }),
+      body: z.object({ desde: z.coerce.number().int().min(1950).max(2100).optional() }).default({}),
+    }),
+    async (req, res) => {
+      const r = await conectorOpenAlex.importar({ idDocente: req.validado.params.id_docente, desde: req.validado.body.desde, idUsuario: req.usuario.id });
+      res.status(r.reaproveitada ? 200 : 201).json(r);
+    },
+  );
 
   /** Andamento de um lote (.zip): status geral e de cada arquivo/docente. */
   rotas.get("/lotes/:id", validar({ params: z.object({ id: z.coerce.number().int().positive() }) }), async (req, res) => {

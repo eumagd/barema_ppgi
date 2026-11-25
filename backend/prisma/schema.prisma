@@ -114,6 +114,8 @@ enum FonteImportacao {
   QUALIS_PUC_RS
   QUALIS_SCOPUS
   QUALIS_EVENTOS
+  /// Conector OpenAlex (API aberta de produção científica).
+  OPENALEX
 
   @@map("fonte_importacao")
 }
@@ -186,6 +188,10 @@ model Docente {
   url_lattes               String?           @db.VarChar(255)
   /// ID do Lattes (16 dígitos): sustenta a validação de vínculo da importação (RF-BE03).
   id_lattes                String?           @unique @db.Char(16)
+  /// ORCID (0000-0000-0000-000X): identifica o docente no OpenAlex sem confundir homônimos (Conector 2).
+  orcid                    String?           @unique @db.VarChar(19)
+  /// ID do autor no OpenAlex (ex.: A5021730842), descoberto pelo ORCID ou informado à mão.
+  id_openalex              String?           @unique @db.VarChar(20)
   data_ultima_atualizacao  DateTime?         @db.Date
   /// Mapeamento da especialização PERMANENTE/COLABORADOR em tabela única.
   vinculo                  VinculoPpgi?
