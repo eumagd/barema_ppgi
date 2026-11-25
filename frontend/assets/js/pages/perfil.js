@@ -82,6 +82,53 @@
     });
   }
 
+  /* ---------- OpenAlex (Conector 2) ---------- */
+  const openalex = { orcid: null, importando: false };
+
+  function openAlexPanel(t) {
+    const valor = openalex.orcid ?? t.orcid ?? "";
+    return UI.panel({
+      title: "Importar do OpenAlex",
+      body: `<p class="text-[14px] text-ink/80">Busca a produção do docente na API aberta do <strong>OpenAlex</strong>, sem CAPTCHA, incluindo <strong>eventos</strong> e <strong>coautores</strong> (que o CSV do QLattes não traz). O docente é identificado pelo ORCID.</p>
+        <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+          ${UI.textField({ id: "orcid", label: "ORCID", value: valor, placeholder: "0000-0002-1825-0097", action: "orcid" })}
+          ${UI.button("Salvar ORCID", { variant: "outline", action: "save-orcid" })}
+        </div>
+        <div class="mt-3">${UI.button(openalex.importando ? "⟳ Importando…" : "⤒ Importar do OpenAlex", { variant: "outline", action: "import-openalex", disabled: openalex.importando || !(t.orcid || t.id_openalex) })}</div>
+        <p class="mt-2 text-[12px] text-muted">${t.id_openalex ? `Autor no OpenAlex: <span class="font-mono">${esc(t.id_openalex)}</span>. ` : ""}Coautores que não estão cadastrados entram como membros externos; o Fuzzy Match junta o que já veio do QLattes.</p>`,
+    });
+  }
+
+  async function saveOrcid() {
+    try {
+      await UseCases.saveOrcid(teacherId, openalex.orcid ?? teacher().orcid ?? "");
+      openalex.orcid = null;
+      Feedback.toast("ORCID salvo.");
+    } catch (erro) {
+      Feedback.toast(erro.message, "error");
+    }
+    view.refresh();
+  }
+
+  async function importOpenAlex() {
+    openalex.importando = true;
+    view.refresh();
+    try {
+      const r = await UseCases.importOpenAlex(teacherId);
+      const c = r.importacao.contagens || {};
+      const fuzzy = c.correspondencias || {};
+      Feedback.toast(
+        r.reaproveitada
+          ? "Nada de novo no OpenAlex desde a última importação."
+          : `${c.novas || 0} nova(s) (${c.periodicos || 0} periódico(s), ${c.eventos || 0} evento(s)), ${c.coautores_externos_criados || 0} coautor(es) externo(s) cadastrado(s), ${fuzzy.para_revisao || 0} para revisar.`,
+      );
+    } catch (erro) {
+      Feedback.toast(erro.message, "error");
+    }
+    openalex.importando = false;
+    view.refresh();
+  }
+
   async function importCsv(confirmName = false) {
     const arquivo = arquivoCsv;
     if (!arquivo) return Feedback.toast("Escolha o arquivo .csv exportado pelo QLattes.", "error");
@@ -128,7 +175,7 @@
         ${cycleSummary(t)}
         <div class="grid gap-5 lg:grid-cols-2">
           ${teacherData(t)}
-          <div class="space-y-5">${importPanel(t)}${participation(t)}${glossary()}</div>
+          <div class="space-y-5">${importPanel(t)}${openAlexPanel(t)}${participation(t)}${glossary()}</div>
         </div>
       </div>`;
   }
@@ -153,9 +200,12 @@
     }),
     {
       render,
+      onInput: { orcid: (el) => { openalex.orcid = el.value; } },
       actions: {
         "confirm-flag": confirmFlag,
         "import-csv": () => importCsv(false),
+        "save-orcid": saveOrcid,
+        "import-openalex": importOpenAlex,
         unflag: () => { UseCases.unflagNotParticipating(teacherId); Feedback.toast("Sinalização desfeita."); view.refresh(); },
       },
     },

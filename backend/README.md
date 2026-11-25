@@ -80,6 +80,7 @@ Rotas autenticadas exigem o cabeçalho `Authorization: Bearer <token>` devolvido
 | `GET /api/avaliacoes/teto-colaboradores` | autenticado | Ranking do teto de 30% de Colaboradores (Art. 8º) |
 | `GET/POST /api/avaliacoes/:id/relatorio` | autenticado | Parecer em texto e HTML; o POST marca o relatório como gerado |
 | `POST /api/avaliacoes/:id/relatorio/enviar` | autenticado | `{ para? }`: envia o parecer por e-mail (processo já tramitado) |
+| `POST /api/importacoes/openalex/:id_docente` | autenticado | `{ desde? }`: importa a produção pelo OpenAlex (precisa do `orcid` ou `id_openalex` do docente) |
 | `GET /api/importacoes/lotes/:id` | autenticado | Andamento de um `.zip` (o POST devolve 202 e processa em segundo plano) |
 | `GET /api/exportacoes/producao.xlsx` ou `.csv` | autenticado | `?inicio=&fim=&id_docente=`: produção com estrato, fonte, peso, divisor e pontos |
 | `GET /api/exportacoes/avaliacoes.xlsx` ou `.csv` | autenticado | `?status=&tipo=`: resumo dos processos |
@@ -119,6 +120,28 @@ lista de coautores nem DOI**. Para isso existe o **cadastro manual** (`/api/publ
   achado em `GET /api/autores?busca=`.
 - Cadastros manuais também passam pelo Fuzzy Match; um DOI já existente é tratado como a mesma
   publicação (mescla com nota 100).
+
+### Conector OpenAlex (Conector 2)
+
+Alternativa ao CAPTCHA do Lattes sugerida pela monitoria: a API aberta do [OpenAlex](https://openalex.org)
+traz a produção do docente **com eventos, coautores e DOI**, o que o CSV do QLattes não traz.
+
+- Cadastre o **ORCID** do docente (`PATCH /api/docentes/:id { "orcid": "0000-0002-1825-0097" }` ou pelo
+  perfil na tela). Na primeira importação o ID do autor no OpenAlex é descoberto e guardado.
+- `POST /api/importacoes/openalex/:id_docente` busca as obras dos últimos 6 anos (ou `{ "desde": 2020 }`):
+  periódicos pelo ISSN, eventos pela sigla (tirada do DOI dos anais da SBC, `10.5753/sbbd.2024…`, ou de
+  "(SIGLA)" no nome). Preprints e repositórios são ignorados.
+- Coautores: docentes pelo ORCID/ID do OpenAlex; os demais pelo nome (em qualquer ordem: "Andrade, Lucas" =
+  "Lucas Andrade"), entre docentes, discentes, externos e variações de citação. Quem não existe vira
+  **membro externo** (se for discente, ajuste o cadastro).
+- Mesmo DOI = mesma publicação; senão título + ano + veículo. O Fuzzy Match roda no fim, então o que já veio
+  do QLattes não duplica. O Qualis continua vindo das tabelas carregadas.
+- **Chave da API:** o OpenAlex é gratuito, mas medido. Sem chave há uma cota diária pequena e compartilhada;
+  com a chave gratuita (`OPENALEX_API_KEY` no `.env`, obtida em https://openalex.org/settings/api) a cota é
+  própria. Uma importação usa poucas requisições (200 obras por página).
+- **Cuidados:** a cobertura de revistas/eventos brasileiros sem DOI é incompleta (por isso o QLattes continua);
+  sem ORCID correto o OpenAlex pode misturar homônimos; confirme com a coordenação se a resolução aceita outra
+  fonte além do Lattes.
 
 ### Fuzzy Match
 
@@ -234,7 +257,7 @@ backend/
 │   ├── dominio/                              regras da Resolução nº 1/2025 (motor de cálculo e parâmetros)
 │   ├── lib/                                  erros, hash de senha, e-mail
 │   ├── middlewares/                          autenticação/RBAC, validação (Zod), erros, limite de tentativas
-│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias, publicacoes, avaliacoes, exportacoes
+│   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, conectores/openalex, correspondencias, publicacoes, avaliacoes, exportacoes
 ├── test/                                     unidade (Prisma em memória) e integracao/ (PostgreSQL)
 ├── scripts/testar-integracao.js              migra o banco de teste e roda test/integracao
 ├── prisma/

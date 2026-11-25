@@ -42,8 +42,8 @@ async function limparBanco() {
 }
 
 /** App + cliente HTTP já autenticado com o perfil pedido. */
-async function clienteAutenticado(perfil = "SECRETARIA") {
-  const app = criarApp({ prisma: obterPrisma(), email: { async enviar(msg) { emailsEnviados.push(msg); } } });
+async function clienteAutenticado(perfil = "SECRETARIA", { openalex } = {}) {
+  const app = criarApp({ prisma: obterPrisma(), email: { async enviar(msg) { emailsEnviados.push(msg); } }, openalex });
   const email = perfil === "SECRETARIA" ? "secretaria@teste.br" : "coordenacao@teste.br";
   const { body } = await request(app).post("/api/auth/login").send({ email, senha: "senha123" });
   const comToken = (metodo) => (url) => request(app)[metodo](url).set("Authorization", `Bearer ${body.token}`);

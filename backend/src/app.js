@@ -21,7 +21,7 @@ const { criarRotasExportacoes } = require("./modulos/exportacoes/exportacoes.rot
 const { autenticar } = require("./middlewares/autenticacao");
 const { rotaNaoEncontrada, tratarErros } = require("./middlewares/erros");
 
-function criarApp({ prisma, email }) {
+function criarApp({ prisma, email, openalex }) {
   const app = express();
   app.locals.prisma = prisma;
 
@@ -48,7 +48,7 @@ function criarApp({ prisma, email }) {
   app.use("/api/externos", autenticar, criarRotasExternos({ prisma }));
   app.use("/api/disciplinas", autenticar, criarRotasDisciplinas({ prisma }));
   app.use("/api/turmas", autenticar, criarRotasTurmas({ prisma }));
-  app.use("/api/importacoes", criarRotasImportacoes({ prisma }));
+  app.use("/api/importacoes", criarRotasImportacoes({ prisma, openalex }));
   app.use("/api/correspondencias", criarRotasCorrespondencias({ prisma }));
   app.use("/api/publicacoes", autenticar, criarRotasPublicacoes({ prisma }));
   app.use("/api/autores", autenticar, criarRotasAutores({ prisma }));
