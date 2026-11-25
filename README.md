@@ -84,7 +84,15 @@ Apoiar o responsável pela condução do processo avaliativo na:
 
 ## Status do Projeto
 
-Em desenvolvimento — fase de levantamento e definição de requisitos (V0).
+Em desenvolvimento. Implementados:
+
+- **Banco de dados** (PostgreSQL + Prisma) a partir do Modelo ER.
+- **API** (Node.js + Express): autenticação com perfis, cadastros, cargas Qualis, importação do CSV do
+  QLattes, Fuzzy Match no PostgreSQL, motor de cálculo da Resolução nº 1/2025, processos de
+  credenciamento/recredenciamento, exportação XLSX/CSV e pareceres por e-mail.
+- **Front end** ligado à API (as telas são servidas pela própria API).
+
+Detalhes em [`backend/README.md`](backend/README.md) e [`frontend/README.md`](frontend/README.md).
 
 ## Controle de Versão do Documento de Requisitos
 
@@ -96,11 +104,28 @@ Em desenvolvimento — fase de levantamento e definição de requisitos (V0).
 
 ## Tecnologias
 
-_A definir conforme o projeto avança._
+- **Back end:** Node.js 20+, Express 5, Prisma ORM, Zod, JWT.
+- **Banco:** PostgreSQL 16, com `pg_trgm`, `unaccent` e `fuzzystrmatch` (Fuzzy Match).
+- **Front end:** HTML, CSS e JavaScript puro, com Tailwind via CDN.
+- **Testes:** `node:test` + supertest (unidade e integração contra o PostgreSQL).
 
 ## Como Executar
 
-_Instruções de instalação e execução serão adicionadas assim que a implementação for iniciada._
+Passo a passo completo, do zero até o primeiro processo, no **[Guia de instalação e uso](GUIA-INSTALACAO.md)**.
+
+Resumo, para quem já tem Node.js e PostgreSQL:
+
+```bash
+cd backend
+npm install
+cp .env.example .env              # ajuste DATABASE_URL e JWT_SECRET
+npx prisma migrate deploy
+npm run preparar                  # resolução nº 1/2025 e parâmetros
+npm run criar-usuario -- --email voce@ic.ufal.br --nome "Seu Nome" --perfil COORDENACAO
+npm start                         # http://localhost:3000
+```
+
+Para uma demonstração com dados fictícios, use `npx prisma db seed` no lugar dos dois comandos do meio.
 
 ## Licença
 

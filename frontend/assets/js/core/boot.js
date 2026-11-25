@@ -12,6 +12,9 @@
 
   const script = document.currentScript;
   const pagina = script.dataset.page;
+  /* Telas de um docente: sem nenhum docente cadastrado, não há o que mostrar. */
+  const DO_DOCENTE = ["perfil", "calculo", "verificacao", "relatorios"];
+  const nomePagina = (pagina.match(/([a-z-]+)\.js$/) || [])[1];
   const app = document.getElementById("app");
 
   function irParaLogin() {
@@ -49,6 +52,10 @@
     carregando();
     PPGI.Dados.carregar(PPGI.Repository.currentPeriod())
       .then(() => {
+        if (DO_DOCENTE.includes(nomePagina) && !PPGI.Dados.docentes().length) {
+          window.location.replace("cadastros.html?aba=docentes");
+          return;
+        }
         const s = document.createElement("script");
         s.src = pagina;
         document.body.appendChild(s);

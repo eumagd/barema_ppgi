@@ -14,7 +14,9 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
-    "test:integracao": "node scripts/testar-integracao.js"
+    "test:integracao": "node scripts/testar-integracao.js",
+    "preparar": "node scripts/preparar-banco.js",
+    "criar-usuario": "node scripts/criar-usuario.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
