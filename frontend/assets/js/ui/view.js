@@ -8,6 +8,8 @@
  *   data-submit="nome"  → envio de <form> chama onSubmit.nome(formulário, evento)
  *
  * Ao redesenhar, o foco do teclado é devolvido ao mesmo controle (acessibilidade).
+ * Formulários com data-preservar="chave" mantêm o que foi digitado enquanto a chave não
+ * mudar (troque a chave para limpar, por exemplo depois de salvar).
  */
 (function (PPGI) {
   "use strict";
@@ -50,10 +52,35 @@
     });
   }
 
+  function captureForms(container) {
+    const saved = {};
+    container.querySelectorAll("form[data-preservar]").forEach((form) => {
+      saved[form.dataset.preservar] = Array.from(form.elements)
+        .filter((el) => el.name && el.type !== "file")
+        .map((el) => [el.name, el.type === "checkbox" ? el.checked : el.value]);
+    });
+    return saved;
+  }
+
+  function restoreForms(container, saved) {
+    container.querySelectorAll("form[data-preservar]").forEach((form) => {
+      const values = saved[form.dataset.preservar];
+      if (!values) return;
+      for (const [name, value] of values) {
+        const el = form.elements[name];
+        if (!el || el.type === "file") continue;
+        if (el.type === "checkbox") el.checked = value;
+        else el.value = value;
+      }
+    });
+  }
+
   function createView(container, { render, actions = {}, onChange = {}, onInput = {}, onSubmit = {} }) {
     function update() {
       const saved = captureFocus(container);
+      const forms = captureForms(container);
       container.innerHTML = render();
+      restoreForms(container, forms);
       restoreFocus(container, saved);
     }
     delegate(container, "click", "action", actions);

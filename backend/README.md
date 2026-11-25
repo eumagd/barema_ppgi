@@ -18,7 +18,10 @@ npm install
 cp .env.example .env          # ajuste DATABASE_URL se não usar o Docker
 npm run db:up                 # sobe o PostgreSQL pelo Docker (opcional)
 npx prisma migrate dev        # aplica as migrações (init + ajustes manuais)
-npx prisma db seed            # dados de demonstração (mesmos do front end)
+npx prisma db seed            # dados de demonstração (APAGA o que houver no banco)
+# ou, para uso real (sem dados fictícios):
+npm run preparar              # Resolução nº 1/2025 e parâmetros
+npm run criar-usuario -- --email voce@ic.ufal.br --nome "Seu Nome" --perfil COORDENACAO
 npx prisma studio             # abre o navegador de dados
 npm run dev                   # sobe a API e o front end em http://localhost:3000
 npm test                      # testes de unidade (não precisam de banco)
@@ -31,6 +34,7 @@ Com npm 11.20 ou mais novo, os scripts de instalação ficam bloqueados; o `post
 `prisma generate`, e se o cliente não for gerado, rode `npx prisma generate`.
 
 Usuários do seed: `secretaria@ic.ufal.br` e `coordenacao@ic.ufal.br`, senha `ppgi2026`.
+Guia passo a passo para quem vai operar a plataforma: [`../GUIA-INSTALACAO.md`](../GUIA-INSTALACAO.md).
 
 ## API
 
@@ -237,6 +241,8 @@ backend/
 │   └── modulos/                              auth, parametros, qualis, cadastros, importacoes, correspondencias, publicacoes, avaliacoes, exportacoes
 ├── test/                                     unidade (Prisma em memória) e integracao/ (PostgreSQL)
 ├── scripts/testar-integracao.js              migra o banco de teste e roda test/integracao
+├── scripts/preparar-banco.js                 npm run preparar: resolução e parâmetros num banco novo
+├── scripts/criar-usuario.js                  npm run criar-usuario: cria usuário ou redefine senha
 ├── prisma/
 │   ├── schema.prisma                         esquema (modelo do Prisma)
 │   ├── seed.js                               dados de demonstração

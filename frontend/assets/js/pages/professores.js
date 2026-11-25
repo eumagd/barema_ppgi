@@ -122,7 +122,9 @@
     const head = ["Docente", "Departamento", "Vínculo institucional", "PPGI"].concat(showsPpgiActions() ? ["Ação"] : []);
     const list = teachers.length
       ? UI.table({ head, rows: teachers.map(teacherRow), caption: "Docentes do Instituto de Computação", footnote: "Dados do servidor do PPGI." })
-      : UI.emptyState("Nenhum docente encontrado com esses critérios. Revise a busca ou os filtros.");
+      : total
+        ? UI.emptyState("Nenhum docente encontrado com esses critérios. Revise a busca ou os filtros.")
+        : `${UI.emptyState("Nenhum docente cadastrado ainda.")}<div class="mt-3">${UI.button("+ Cadastrar o primeiro docente", { href: "cadastros.html?aba=docentes" })}</div>`;
     return `<p class="mb-2 text-[13px] text-muted" aria-live="polite">Mostrando ${teachers.length} de ${total} docentes</p>${list}`;
   }
 
