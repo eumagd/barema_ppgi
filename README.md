@@ -20,11 +20,10 @@ Projeto acadêmico desenvolvido para a disciplina de **Programação 3 (P3)**, n
 - [5. Fontes de Dados e Fuzzy Match](#5-fontes-de-dados-e-fuzzy-match)
 - [6. Requisitos e Status](#6-requisitos-e-status)
 - [7. Persistência de Dados](#7-persistência-de-dados)
-- [8. Padrão de Versionamento (Conventional Commits)](#8-padrão-de-versionamento-conventional-commits)
-- [9. Como Executar](#9-como-executar)
-- [10. Como Executar os Testes](#10-como-executar-os-testes)
-- [11. Glossário](#11-glossário)
-- [12. Equipe e Autoria](#12-equipe-e-autoria)
+- [8. Como Executar](#8-como-executar)
+- [9. Como Executar os Testes](#9-como-executar-os-testes)
+- [10. Glossário](#10-glossário)
+- [11. Equipe e Autoria](#11-equipe-e-autoria)
 
 ---
 
@@ -210,26 +209,7 @@ Juntar uma publicação é reversível: rejeitar a correspondência, mesmo autom
 
 ---
 
-## 8. Padrão de Versionamento (Conventional Commits)
-
-O projeto adota a convenção de mensagens de commit do [Conventional Commits](https://www.conventionalcommits.org/pt-br/v1.0.0/):
-
-```text
-<tipo>(<escopo>): <descrição no imperativo e em minúsculas>
-
-[corpo opcional detalhando a motivação da alteração]
-```
-
-### Fluxo de trabalho
-
-- Cada entrega é feita numa branch `feat/<assunto>` (ou `fix/`, `docs/`) e entra na `main` por **Pull Request**.
-- Um PR que parte de outra branch de PR deve ter a **base trocada para `main` antes** de a branch de baixo ser mergeada.
-- Escopos usados: `banco`, `api`, `qualis`, `cadastros`, `importacoes`, `fuzzy`, `publicacoes`, `avaliacoes`, `openalex`, `frontend`, `docs`.
-- Depois de um `git pull` com migrações novas: `npx prisma migrate deploy` na pasta `backend`.
-
----
-
-## 9. Como Executar
+## 8. Como Executar
 
 Passo a passo completo (Windows e Linux), do zero até o primeiro processo: **[GUIA-INSTALACAO.md](GUIA-INSTALACAO.md)**.
 
@@ -250,11 +230,11 @@ npm start                         # http://localhost:3000
 
 ---
 
-## 10. Como Executar os Testes
+## 9. Como Executar os Testes
 
 Todos os comandos rodam na pasta [`backend`](backend/).
 
-### 10.1 Testes de unidade (sem banco)
+### 9.1 Testes de unidade (sem banco)
 
 ```bash
 npm test
@@ -262,7 +242,7 @@ npm test
 
 Motor de cálculo (cada regra da resolução), leitores de CSV (QLattes e Qualis), mapeamento do OpenAlex, autenticação e parâmetros. Usam um Prisma em memória.
 
-### 10.2 Testes de integração (PostgreSQL)
+### 9.2 Testes de integração (PostgreSQL)
 
 ```bash
 npm run test:integracao
@@ -277,7 +257,7 @@ Rodam no banco indicado por `DATABASE_URL_TESTE`, **que é apagado a cada execu�
 
 ---
 
-## 11. Glossário
+## 10. Glossário
 
 | Termo | Definição |
 |---|---|
@@ -296,7 +276,7 @@ Rodam no banco indicado por `DATABASE_URL_TESTE`, **que é apagado a cada execu�
 
 ---
 
-## 12. Equipe e Autoria
+## 11. Equipe e Autoria
 
 **Equipe**
 
