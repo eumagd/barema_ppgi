@@ -143,6 +143,10 @@
     return Api.baixar(`/exportacoes/producao.${format}?${p}`, `producao.${format}`).catch((e) => PPGI.Feedback.toast(e.message, "error"));
   }
 
+  function exportEvaluations(format) {
+    return Api.baixar(`/exportacoes/avaliacoes.${format}`, `avaliacoes.${format}`).catch((e) => PPGI.Feedback.toast(e.message, "error"));
+  }
+
   /** Antes: apagava os dados de demonstração. Agora os dados vêm do servidor: só recarrega. */
   function resetSampleData() {
     return Dados.recarregar();
@@ -151,6 +155,6 @@
   PPGI.UseCases = {
     unlinkFromPpgi, restorePpgiLink, flagNotParticipating, unflagNotParticipating, importCsv, importZip, saveOrcid, importOpenAlex,
     PROCESS_TYPES, processTypeFor, candidatesFor, startProcess, generateReport, sendReport, fetchReport,
-    exportProduction, resetSampleData,
+    exportProduction, exportEvaluations, resetSampleData,
   };
 })((window.PPGI = window.PPGI || {}));

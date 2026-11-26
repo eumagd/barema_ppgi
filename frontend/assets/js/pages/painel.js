@@ -4,7 +4,7 @@
 (function (PPGI) {
   "use strict";
 
-  const { Shell, UI, Repository, Barema, Catalog, Auth, Format, TeacherHeader } = PPGI;
+  const { Shell, UI, Repository, Barema, Catalog, Auth, Format, TeacherHeader, UseCases } = PPGI;
   const { escapeHtml: esc, formatNumber } = Format;
 
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -81,13 +81,27 @@
     return UI.panel({ title: "Currículo Lattes", actions: UI.button("Ver docentes", { variant: "ghost", href: "professores.html" }), body });
   }
 
+  function exportPanel() {
+    const period = Repository.currentPeriod();
+    const linha = (titulo, dica, acao) => `<div class="border-b border-ppgi-soft py-3 last:border-0">
+        <p class="text-[14px] font-semibold text-ink">${esc(titulo)}</p>
+        <p class="text-[12px] text-muted">${esc(dica)}</p>
+        <div class="mt-2 flex flex-wrap gap-2">${UI.button("⤓ Excel (.xlsx)", { variant: "outline", action: acao, data: { formato: "xlsx" } })}${UI.button("⤓ CSV", { variant: "ghost", action: acao, data: { formato: "csv" } })}</div>
+      </div>`;
+    return UI.panel({
+      title: "Exportar planilhas",
+      body: linha("Produção dos docentes do PPGI", `Período ${period.label}: estrato, fonte, divisor e pontos de cada publicação.`, "export-producao") +
+        linha("Processos avaliativos", "Situação, pontuação e relatório de cada processo.", "export-avaliacoes"),
+    });
+  }
+
   function render() {
     const teachers = Repository.allTeachers();
     return `<div class="space-y-6">
       ${cycleStats(teachers)}
       <div class="grid gap-5 xl:grid-cols-[1fr_360px]">
         <div class="min-w-0">${processesPanel(teachers)}</div>
-        <div class="space-y-5">${pendingReportsPanel(teachers)}${lattesPanel(teachers)}</div>
+        <div class="space-y-5">${pendingReportsPanel(teachers)}${exportPanel()}${lattesPanel(teachers)}</div>
       </div>
     </div>`;
   }
@@ -99,6 +113,12 @@
       title: "Painel",
       lead: user ? `${greeting()}, ${esc(user.name)}. Esta é a situação do ciclo ${Catalog.CYCLE.year} de credenciamento e recredenciamento.` : "",
     },
-    { render },
+    {
+      render,
+      actions: {
+        "export-producao": (el) => UseCases.exportProduction(el.dataset.formato, { period: Repository.currentPeriod() }),
+        "export-avaliacoes": (el) => UseCases.exportEvaluations(el.dataset.formato),
+      },
+    },
   );
 })(window.PPGI);
