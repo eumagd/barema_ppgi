@@ -22,6 +22,7 @@
       opts.required ? "required" : "",
       opts.min !== undefined ? `min="${opts.min}"` : "",
       opts.max !== undefined ? `max="${opts.max}"` : "",
+      opts.step !== undefined ? `step="${opts.step}"` : opts.type === "number" ? 'step="any"' : "",
       opts.hint ? `aria-describedby="${id}-dica"` : "",
     ].join(" ");
     const dica = opts.hint ? `<p id="${id}-dica" class="mt-1 text-[12px] text-muted">${esc(opts.hint)}</p>` : "";

@@ -18,6 +18,7 @@
     { key: "cadastros", label: "Cadastros", href: "cadastros.html", icon: '<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>' },
     { key: "qualis", label: "Bases Qualis", href: "qualis.html", icon: '<path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/>' },
     { key: "revisao", label: "Revisão", href: "revisao.html", icon: '<path d="M4 6h16M4 12h10M4 18h7"/><circle cx="17" cy="16" r="3"/><path d="M19.5 18.5L22 21"/>' },
+    { key: "parametros", label: "Parâmetros", href: "parametros.html", icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>' },
   ];
 
   /* ---------- Acesso ---------- */
