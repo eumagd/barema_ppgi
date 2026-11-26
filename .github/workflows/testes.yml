@@ -1,0 +1,56 @@
+# Roda os testes do back end a cada push e pull request na main.
+# Unidade: sem banco. Integração: num PostgreSQL 16 de verdade (com pg_trgm,
+# unaccent e fuzzystrmatch, que já vêm na imagem oficial).
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ppgi
+          POSTGRES_PASSWORD: ppgi
+          POSTGRES_DB: barema_ppgi_teste
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ppgi"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # DATABASE_URL precisa ser diferente da de teste (o script recusa usar o mesmo banco).
+      DATABASE_URL: postgresql://ppgi:ppgi@localhost:5432/barema_ppgi?schema=public
+      DATABASE_URL_TESTE: postgresql://ppgi:ppgi@localhost:5432/barema_ppgi_teste?schema=public
+      JWT_SECRET: segredo-apenas-para-os-testes
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Testes de unidade
+        run: npm test
+
+      - name: Testes de integração (PostgreSQL)
+        run: npm run test:integracao
