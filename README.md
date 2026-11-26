@@ -7,7 +7,7 @@
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg?style=for-the-badge)](https://conventionalcommits.org)
 [![UFAL](https://img.shields.io/badge/UFAL-Ciência%20da%20Computação-red?style=for-the-badge)](https://ic.ufal.br/)
 
-Projeto acadêmico desenvolvido para as disciplinas de **Programação 3 (P3)** e **ACE 1**, no curso de **Bacharelado em Ciência da Computação** do **Instituto de Computação (IC)** da **Universidade Federal de Alagoas (UFAL)**, para o **Programa de Pós-Graduação em Informática (PPGI/UFAL)**.
+Projeto acadêmico desenvolvido para a disciplina de **Programação 3 (P3)**, no curso de **Bacharelado em Ciência da Computação** do **Instituto de Computação (IC)** da **Universidade Federal de Alagoas (UFAL)**, para o **Programa de Pós-Graduação em Informática (PPGI/UFAL)**.
 
 ---
 
