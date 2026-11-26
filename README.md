@@ -4,6 +4,7 @@
 [![Express](https://img.shields.io/badge/Express-5-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Testes](https://github.com/eumagd/barema_ppgi/actions/workflows/testes.yml/badge.svg)](https://github.com/eumagd/barema_ppgi/actions/workflows/testes.yml)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg?style=for-the-badge)](https://conventionalcommits.org)
 [![UFAL](https://img.shields.io/badge/UFAL-Ciência%20da%20Computação-red?style=for-the-badge)](https://ic.ufal.br/)
 
@@ -77,7 +78,7 @@ flowchart TD
 
 | Tela | O que faz |
 |---|---|
-| **Painel** | Situação do ciclo: processos em andamento, relatórios a enviar |
+| **Painel** | Situação do ciclo: processos em andamento, relatórios a enviar e exportação XLSX/CSV |
 | **Docentes / Perfil** | Lista do IC, vínculo com o PPGI, importação do QLattes (.zip ou .csv) e do OpenAlex |
 | **Cálculo / Requisitos** | Pontuação por publicação, divisão entre coautores e cada critério (exigido × obtido) |
 | **Relatório** | Parecer do docente, impressão em PDF e envio por e-mail |
@@ -85,6 +86,7 @@ flowchart TD
 | **Revisão** | Coautorias do Fuzzy Match a decidir e veículos sem estrato Qualis |
 | **Cadastros** | Docentes, discentes e coorientações, membros externos, disciplinas e turmas, publicação manual |
 | **Bases Qualis** | Envio das tabelas, histórico de cargas e consulta do estrato |
+| **Parâmetros** | Pesos, mínimos e cortes do Fuzzy Match da resolução (a coordenação edita) |
 
 ---
 
@@ -108,7 +110,7 @@ O passo a passo completo está no **[Guia de instalação e uso](GUIA-INSTALACAO
 ## 4. Regras da Resolução nº 1/2025
 
 > [!NOTE]
-> Os valores abaixo ficam na tabela `parametro` do banco e podem ser ajustados pela coordenação sem novo deploy. As regras estão em [`backend/src/dominio/motor-barema.js`](backend/src/dominio/motor-barema.js), testadas uma a uma.
+> Os valores abaixo ficam na tabela `parametro` do banco e podem ser ajustados pela coordenação na tela **Parâmetros**, sem novo deploy. As regras estão em [`backend/src/dominio/motor-barema.js`](backend/src/dominio/motor-barema.js), testadas uma a uma.
 
 | Critério | Regra |
 |---|---|
@@ -193,6 +195,7 @@ Juntar uma publicação é reversível: rejeitar a correspondência, mesmo autom
 - [x] **Front end ligado à API**, com telas de cadastro e de bases Qualis
 - [x] **Conector OpenAlex** (eventos e coautores, sem CAPTCHA)
 - [x] **Guia de instalação** para o professor responsável
+- [x] **Tela de parâmetros**, exportação pelo painel e **testes automáticos no GitHub** (CI)
 - [ ] Reavaliar a importação pelo QLattes após a **mudança do site do Lattes** (26/11/2026)
 - [ ] Calibrar os cortes do Fuzzy Match com a planilha histórica (`Credenciamento2026.xlsx`)
 - [ ] Importação da planilha de transição (quando o layout estiver disponível)

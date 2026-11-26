@@ -227,26 +227,13 @@ Publicação manual**. Para evento, informe a **sigla** (ela busca o estrato na 
   clique em **Iniciar**. O cálculo fica gravado no processo.
 - A **coordenação** defere ou indefere. Deferir um credenciamento grava o vínculo do docente.
 - Aba **Relatório**: gere o parecer e **envie por e-mail** (exige o SMTP da seção 6).
+- No **Painel**, **Exportar planilhas** gera a produção do período e os processos em Excel ou CSV.
 
 ## 5. Ajustes da coordenação (parâmetros da resolução)
 
-Os pesos por estrato, os mínimos exigidos e os cortes do Fuzzy Match ficam no banco e podem ser
-mudados **pela coordenação**, sem novo deploy. Ainda não há tela para isso; use a API pelo PowerShell
-(com a plataforma ligada):
-
-```powershell
-$login = Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/auth/login -ContentType "application/json" -Body '{"email":"coordenacao.ppgi@ic.ufal.br","senha":"SUA_SENHA"}'
-$h = @{ Authorization = "Bearer $($login.token)" }
-Invoke-RestMethod -Uri http://localhost:3000/api/resolucoes -Headers $h          # mostra o id da resolução (1 num banco novo)
-Invoke-RestMethod -Uri http://localhost:3000/api/resolucoes/1/parametros -Headers $h | ConvertTo-Json -Depth 5
-```
-
-Exemplo: mudar o corte de revisão do Fuzzy Match para 85 e reprocessar a base:
-
-```powershell
-Invoke-RestMethod -Method Put -Uri http://localhost:3000/api/resolucoes/1/parametros/fuzzy.corte_revisao -Headers $h -ContentType "application/json" -Body '{"valor":85}'
-Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/correspondencias/processar -Headers $h
-```
+Os pesos por estrato, os mínimos exigidos e os cortes do Fuzzy Match ficam no banco e são
+ajustados no menu **Parâmetros**: a coordenação edita e salva; a secretaria só consulta. Números
+aceitam vírgula (0,875). Ao mudar os cortes do Fuzzy Match, a tela oferece reprocessar a base.
 
 | Parâmetro | Padrão | O que é |
 | --- | --- | --- |
@@ -256,9 +243,9 @@ Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/correspondencias/p
 | `fuzzy.corte_confirmacao` / `fuzzy.corte_revisao` | 92 / 80 | Faixas do Fuzzy Match |
 | `docencia.niveis` | só pós-graduação | Níveis de disciplina que contam |
 
-A lista completa está no README do back end. **Calibração do Fuzzy Match:** os cortes 92/80 ainda
-não foram conferidos com a planilha histórica (`Credenciamento2026.xlsx`); vale comparar alguns casos
-da planilha com a tela **Revisão** e ajustar se necessário.
+**Calibração do Fuzzy Match:** os cortes 92/80 ainda não foram conferidos com a planilha histórica
+(`Credenciamento2026.xlsx`); vale comparar alguns casos da planilha com a tela **Revisão** e ajustar
+em **Parâmetros**.
 
 ## 6. E-mail (recuperação de senha e pareceres)
 
